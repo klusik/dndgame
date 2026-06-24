@@ -17,6 +17,9 @@
     <p class="muted-text">After ChatGPT replies, paste the full answer into the response box below. A valid state delta is applied automatically, then the full saved DM response opens before the next action box.</p>
     <div class="copy-toolbar"><button class="button button-primary" data-copy-target="prompt-text">Copy prompt</button></div>
     <textarea id="prompt-text" class="large-textarea" readonly><?= e($promptText) ?></textarea>
+    <div class="copy-toolbar copy-toolbar-bottom">
+        <button class="button button-primary" data-copy-target="prompt-text">Copy prompt</button>
+    </div>
 </div>
 <div class="card workflow-card">
     <div class="step-label">Step 2</div>
