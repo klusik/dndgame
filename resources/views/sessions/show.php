@@ -3,6 +3,8 @@
 /** @var array<string, mixed> $session */
 /** @var string $narrativeHtml */
 /** @var string $rawText */
+/** @var array<string, mixed> $rollRequirement */
+/** @var string $rollContextKey */
 ?>
 <section class="page-header compact-page-header session-reader-header">
     <div>
@@ -28,7 +30,11 @@
 <section class="card workflow-card next-turn-card">
     <div class="step-label">Next turn</div>
     <h2>What do you do next?</h2>
-    <p class="muted-text">Write your next action. If the DM asked for a check, use the dice helper and the roll will be included in the next generated prompt.</p>
+    <?php if (!empty($rollRequirement['required'])): ?>
+        <div class="alert alert-warning"><strong>Roll required.</strong> <?= e((string) $rollRequirement['summary']) ?></div>
+    <?php else: ?>
+        <p class="muted-text">Write your next action. Use the dice helper only when the DM asked for a check.</p>
+    <?php endif; ?>
     <?= App\Core\View::partial('partials/next_action_form', [
         'app' => $app,
         'campaign' => $campaign,
@@ -36,6 +42,11 @@
         'defaultNarrativeLength' => 'medium',
         'defaultChallengeLevel' => 'balanced',
         'defaultDicePolicy' => 'occasional',
+        'rollRequired' => (bool) ($rollRequirement['required'] ?? false),
+        'rollRequirementSummary' => (string) ($rollRequirement['summary'] ?? ''),
+        'rollExpression' => (string) ($rollRequirement['expression'] ?? '1d20'),
+        'rollReason' => (string) ($rollRequirement['reason'] ?? 'Requested check'),
+        'rollContextKey' => $rollContextKey,
         'buttonLabel' => 'Generate next prompt',
     ]) ?>
 </section>

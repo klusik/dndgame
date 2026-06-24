@@ -11,6 +11,7 @@ use App\Repositories\CampaignRepository;
 use App\Repositories\SessionRepository;
 use App\Services\FileStorage;
 use App\Services\MarkdownRenderer;
+use App\Services\RollRequirementDetector;
 
 /**
  * Session browsing controller.
@@ -42,11 +43,15 @@ final class SessionController extends Controller
         $storage = new FileStorage(APP_ROOT);
         $renderer = new MarkdownRenderer();
         $narrative = $storage->read((string) $session['narrative_file']);
+        $rollRequirement = (new RollRequirementDetector())->detect($narrative);
+        $rollContextKey = sprintf('campaign-%d-session-%d', (int) $campaign['id'], (int) $session['id']);
         return $this->render('sessions/show', [
             'campaign' => $campaign,
             'session' => $session,
             'narrativeHtml' => $renderer->render($narrative),
             'rawText' => $storage->read((string) $session['raw_transcript_file']),
+            'rollRequirement' => $rollRequirement,
+            'rollContextKey' => $rollContextKey,
         ]);
     }
 

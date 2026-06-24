@@ -16,6 +16,7 @@ use App\Repositories\SessionRepository;
 use App\Services\ContextPackService;
 use App\Services\FileStorage;
 use App\Services\PromptCompiler;
+use App\Services\RollRequirementDetector;
 
 /**
  * Prompt generation controller.
@@ -28,7 +29,7 @@ final class PromptController extends Controller
     public function create(Request $request, string $id): Response
     {
         $campaign = $this->requireCampaign((int) $id);
-        return $this->render('prompts/create', ['campaign' => $campaign, 'errors' => []]);
+        return $this->render('prompts/create', $this->promptFormData($campaign, ['errors' => []]));
     }
 
     /**
@@ -47,10 +48,18 @@ final class PromptController extends Controller
         $dicePolicy = $this->normalizeDicePolicy((string) $request->input('dice_policy', 'occasional'));
         $agencyMode = $this->normalizeAgencyMode((string) $request->input('agency_mode', 'player_led'));
         $descriptionStyle = $this->normalizeDescriptionStyle((string) $request->input('description_style', 'direct'));
+        $rollRequirement = $this->latestRollRequirement((int) $campaign['id']);
+        $errors = [];
         if ($userAction === '') {
-            return $this->render('prompts/create', [
-                'campaign' => $campaign,
-                'errors' => ['user_action' => 'Player action is required.'],
+            $errors['user_action'] = 'Player action is required.';
+        }
+        if (($rollRequirement['required'] ?? false) && $diceResults === '') {
+            $errors['dice_results'] = 'The previous DM response requires a dice roll before the next prompt can be generated.';
+        }
+
+        if ($errors !== []) {
+            return $this->render('prompts/create', $this->promptFormData($campaign, [
+                'errors' => $errors,
                 'userAction' => $userAction,
                 'extraNotes' => $extraNotes,
                 'diceResults' => $diceResults,
@@ -60,7 +69,9 @@ final class PromptController extends Controller
                 'defaultDicePolicy' => $dicePolicy,
                 'defaultAgencyMode' => $agencyMode,
                 'defaultDescriptionStyle' => $descriptionStyle,
-            ]);
+                'rollRequirement' => $rollRequirement,
+                'rollContextKey' => $this->latestRollContextKey((int) $campaign['id']),
+            ]));
         }
 
         $compiler = new PromptCompiler($this->contextPackService());
@@ -110,6 +121,57 @@ final class PromptController extends Controller
             'prompt' => $prompt,
             'promptText' => $storage->read((string) $prompt['prompt_file']),
         ]);
+    }
+
+
+    /**
+     * Build default data for the prompt creation form.
+     *
+     * @param array<string, mixed> $campaign
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
+     */
+    private function promptFormData(array $campaign, array $overrides = []): array
+    {
+        $campaignId = (int) $campaign['id'];
+        return $overrides + [
+            'campaign' => $campaign,
+            'errors' => [],
+            'rollRequirement' => $this->latestRollRequirement($campaignId),
+            'rollContextKey' => $this->latestRollContextKey($campaignId),
+        ];
+    }
+
+    /**
+     * Return the latest roll requirement for the campaign.
+     *
+     * @return array{required:bool, expression:string, reason:string, summary:string}
+     */
+    private function latestRollRequirement(int $campaignId): array
+    {
+        $sessions = (new SessionRepository($this->app->database()))->recent($campaignId, 1);
+        $latestSession = $sessions[0] ?? null;
+        if (!$latestSession) {
+            return (new RollRequirementDetector())->detect('');
+        }
+
+        $storage = new FileStorage(APP_ROOT);
+        $narrative = $storage->read((string) $latestSession['narrative_file']);
+        return (new RollRequirementDetector())->detect($narrative);
+    }
+
+    /**
+     * Return the browser-side roll lock key for the latest campaign turn.
+     */
+    private function latestRollContextKey(int $campaignId): string
+    {
+        $sessions = (new SessionRepository($this->app->database()))->recent($campaignId, 1);
+        $latestSession = $sessions[0] ?? null;
+        if (!$latestSession) {
+            return sprintf('campaign-%d-empty', $campaignId);
+        }
+
+        return sprintf('campaign-%d-session-%d', $campaignId, (int) $latestSession['id']);
     }
 
     /**

@@ -1,5 +1,6 @@
 <?php
 /** @var array<string, mixed> $campaign */
+/** @var array<string, mixed> $rollRequirement */
 $selectedLanguage = $responseLanguage ?? $app->translator()->locale();
 ?>
 <section class="page-header compact-page-header">
@@ -24,5 +25,10 @@ $selectedLanguage = $responseLanguage ?? $app->translator()->locale();
         'userAction' => $userAction ?? '',
         'extraNotes' => $extraNotes ?? '',
         'diceResults' => $diceResults ?? '',
+        'rollRequired' => (bool) (($rollRequirement['required'] ?? false)),
+        'rollRequirementSummary' => (string) (($rollRequirement['summary'] ?? '')),
+        'rollExpression' => (string) (($rollRequirement['expression'] ?? '1d20')),
+        'rollReason' => (string) (($rollRequirement['reason'] ?? 'Requested check')),
+        'rollContextKey' => $rollContextKey ?? ('campaign-' . $campaign['id'] . '-prompt-create'),
     ]) ?>
 </div>

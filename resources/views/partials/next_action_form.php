@@ -9,6 +9,11 @@
  * @var string $defaultDescriptionStyle
  * @var string $buttonLabel
  * @var string $placeholder
+ * @var bool $rollRequired
+ * @var string $rollRequirementSummary
+ * @var string $rollExpression
+ * @var string $rollReason
+ * @var string $rollContextKey
  */
 $selectedLanguage = $selectedLanguage ?? $app->translator()->locale();
 $defaultNarrativeLength = $defaultNarrativeLength ?? 'medium';
@@ -18,29 +23,42 @@ $defaultAgencyMode = $defaultAgencyMode ?? 'player_led';
 $defaultDescriptionStyle = $defaultDescriptionStyle ?? 'direct';
 $buttonLabel = $buttonLabel ?? 'Generate next prompt';
 $placeholder = $placeholder ?? 'Describe only what your character attempts in this campaign. Example: I inspect the corridor carefully and listen for movement.';
+$rollRequired = (bool) ($rollRequired ?? false);
+$rollRequirementSummary = $rollRequirementSummary ?? '';
+$rollExpression = $rollExpression ?? '1d20';
+$rollReason = $rollReason ?? 'Requested check';
+$rollContextKey = $rollContextKey ?? ('campaign-' . $campaign['id'] . '-manual');
+$diceResults = trim((string) ($diceResults ?? ''));
 ?>
-<form method="post" action="<?= e(url('/campaigns/' . $campaign['id'] . '/prompt')) ?>" class="next-action-form">
+<form method="post" action="<?= e(url('/campaigns/' . $campaign['id'] . '/prompt')) ?>" class="next-action-form" data-roll-required="<?= $rollRequired ? '1' : '0' ?>">
     <?= App\Core\Csrf::field($app->session()) ?>
 
     <label>Player action or request
         <textarea name="user_action" rows="7" required autofocus placeholder="<?= e($placeholder) ?>"><?= e($userAction ?? '') ?></textarea>
     </label>
 
-    <details class="dice-helper-panel">
-        <summary>Dice helper, use when ChatGPT asks for a check</summary>
+    <details class="dice-helper-panel" data-dice-helper-panel data-roll-context-key="<?= e($rollContextKey) ?>" <?= $rollRequired || $diceResults !== '' ? 'open' : '' ?>>
+        <summary><?= $rollRequired ? 'Required dice roll' : 'Dice helper, use only when ChatGPT asks for a check' ?></summary>
+        <?php if ($rollRequired): ?>
+            <div class="roll-required-note">
+                <strong>Roll is required before continuing.</strong>
+                <?php if ($rollRequirementSummary !== ''): ?><span><?= e($rollRequirementSummary) ?></span><?php endif; ?>
+            </div>
+        <?php endif; ?>
         <div class="dice-helper-grid">
             <label>Check name or reason
-                <input type="text" data-dice-reason placeholder="Technology check, Perception, Stealth">
+                <input type="text" data-dice-reason value="<?= e($rollReason) ?>" placeholder="Technology check, Perception, Stealth">
             </label>
             <label>Dice expression
-                <input type="text" data-dice-expression value="1d20" placeholder="1d20+4, 2d20kh1+2, 1d8+2">
+                <input type="text" data-dice-expression value="<?= e($rollExpression) ?>" placeholder="1d20+4, 2d20kh1+2, 1d8+2">
             </label>
-            <button class="button" type="button" data-roll-dice>Roll and add</button>
+            <button class="button" type="button" data-roll-dice <?= $diceResults !== '' ? 'disabled' : '' ?>>Roll once</button>
         </div>
-        <label>Dice results for this turn
-            <textarea name="dice_results" data-dice-results rows="4" placeholder="Dice rolls added by the helper will appear here."><?= e($diceResults ?? '') ?></textarea>
-        </label>
-        <p class="muted-text compact-help-text">Supported notation: NdM, numeric modifiers, advantage as 2d20kh1, disadvantage as 2d20kl1. The result is inserted into the next prompt so ChatGPT can resolve the requested check.</p>
+        <input type="hidden" name="dice_results" data-dice-results value="<?= e($diceResults) ?>">
+        <div class="dice-result-display <?= $diceResults === '' ? 'is-empty' : '' ?>" data-dice-result-display aria-live="polite">
+            <?= $diceResults === '' ? 'No roll recorded yet.' : e($diceResults) ?>
+        </div>
+        <p class="muted-text compact-help-text">The roll result is locked after the first roll and is inserted into the next prompt. Supported notation: NdM, numeric modifiers, advantage as 2d20kh1, disadvantage as 2d20kl1.</p>
     </details>
 
     <div class="inline-fields prompt-control-grid">

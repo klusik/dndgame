@@ -193,7 +193,7 @@ PROMPT);
      */
     private function diceInstruction(string $policy): string
     {
-        $base = 'If a check is needed, ask the player to roll instead of rolling for them. State the exact dice expression, the relevant skill or attribute, all known modifiers, and what success or failure might broadly mean without revealing hidden outcomes. If dice results are supplied below, use them and show raw roll, modifiers, and final total in the narrative.';
+        $base = 'If a check is needed, ask the player to roll instead of rolling for them. Use a clear standardized request so the app can detect it: write a short line ending with "Check required", then a separate line starting with "Roll:" and the exact dice expression, for example "Roll: 1d20 + Technical Knowledge modifier". State all known modifiers and what success or failure might broadly mean without revealing hidden outcomes. If dice results are supplied below, use them and show raw roll, modifiers, and final total in the narrative. Do not resolve the check until dice results are supplied.';
 
         return match ($policy) {
             'rare' => '- Request dice rarely. Use checks only for meaningful risk, uncertainty, opposition, or time pressure. ' . $base,

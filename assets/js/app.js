@@ -94,29 +94,145 @@
     }
 
     /**
-     * Roll dice from the nearest helper panel and append the result.
+     * Return the browser storage key for a dice helper panel.
+     */
+    function diceStorageKey(panel) {
+        const contextKey = panel.getAttribute('data-roll-context-key') || '';
+        return contextKey === '' ? '' : `dnd-campaign-roll:${contextKey}`;
+    }
+
+    /**
+     * Persist the locked roll for this turn in browser storage.
+     */
+    function rememberLockedRoll(panel, line) {
+        const key = diceStorageKey(panel);
+        if (key === '') {
+            return;
+        }
+
+        try {
+            window.localStorage.setItem(key, line);
+        } catch (error) {
+            return;
+        }
+    }
+
+    /**
+     * Return a previously locked roll for this turn from browser storage.
+     */
+    function rememberedLockedRoll(panel) {
+        const key = diceStorageKey(panel);
+        if (key === '') {
+            return '';
+        }
+
+        try {
+            return window.localStorage.getItem(key) || '';
+        } catch (error) {
+            return '';
+        }
+    }
+
+    /**
+     * Set the locked roll label, hidden input, and disabled field state.
+     */
+    function lockDiceResult(panel, line) {
+        const expressionInput = panel.querySelector('[data-dice-expression]');
+        const reasonInput = panel.querySelector('[data-dice-reason]');
+        const resultInput = panel.querySelector('[data-dice-results]');
+        const resultDisplay = panel.querySelector('[data-dice-result-display]');
+        const rollButton = panel.querySelector('[data-roll-dice]');
+
+        if (resultInput instanceof HTMLInputElement) {
+            resultInput.value = line;
+            resultInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        if (resultDisplay instanceof HTMLElement) {
+            resultDisplay.textContent = line;
+            resultDisplay.classList.remove('is-empty');
+        }
+        if (rollButton instanceof HTMLButtonElement) {
+            rollButton.disabled = true;
+            rollButton.textContent = 'Roll locked';
+        }
+        if (expressionInput instanceof HTMLInputElement) {
+            expressionInput.readOnly = true;
+        }
+        if (reasonInput instanceof HTMLInputElement) {
+            reasonInput.readOnly = true;
+        }
+
+        panel.classList.add('dice-locked');
+    }
+
+    /**
+     * Roll dice from the nearest helper panel and lock the result.
      */
     function handleDiceRoll(button) {
-        const panel = button.closest('.dice-helper-panel');
+        const panel = button.closest('[data-dice-helper-panel]');
         if (!panel) {
             return;
         }
 
         const expressionInput = panel.querySelector('[data-dice-expression]');
         const reasonInput = panel.querySelector('[data-dice-reason]');
-        const resultsInput = panel.querySelector('[data-dice-results]');
-        if (!(expressionInput instanceof HTMLInputElement) || !(reasonInput instanceof HTMLInputElement) || !(resultsInput instanceof HTMLTextAreaElement)) {
+        const resultInput = panel.querySelector('[data-dice-results]');
+        if (!(expressionInput instanceof HTMLInputElement) || !(reasonInput instanceof HTMLInputElement) || !(resultInput instanceof HTMLInputElement)) {
+            return;
+        }
+
+        if (resultInput.value.trim() !== '') {
+            window.alert('A roll is already recorded for this turn. Use the recorded result.');
             return;
         }
 
         try {
             const result = rollExpression(expressionInput.value || '1d20');
             const line = formatRollResult(reasonInput.value || '', result);
-            resultsInput.value = resultsInput.value.trim() === '' ? line : `${resultsInput.value.trim()}\n${line}`;
-            resultsInput.dispatchEvent(new Event('input', { bubbles: true }));
+            lockDiceResult(panel, line);
+            rememberLockedRoll(panel, line);
         } catch (error) {
             window.alert(error instanceof Error ? error.message : 'The dice expression could not be rolled.');
         }
+    }
+
+    /**
+     * Restore locked rolls from browser storage after a reload.
+     */
+    function initializeDiceHelpers() {
+        document.querySelectorAll('[data-dice-helper-panel]').forEach((panel) => {
+            const resultInput = panel.querySelector('[data-dice-results]');
+            if (!(resultInput instanceof HTMLInputElement)) {
+                return;
+            }
+
+            const existing = resultInput.value.trim() || rememberedLockedRoll(panel).trim();
+            if (existing !== '') {
+                lockDiceResult(panel, existing);
+            }
+        });
+    }
+
+    /**
+     * Prevent prompt generation when a roll is required but not recorded yet.
+     */
+    function validateNextActionForm(form, event) {
+        if (form.getAttribute('data-roll-required') !== '1') {
+            return;
+        }
+
+        const resultInput = form.querySelector('[data-dice-results]');
+        if (resultInput instanceof HTMLInputElement && resultInput.value.trim() !== '') {
+            return;
+        }
+
+        event.preventDefault();
+        const panel = form.querySelector('[data-dice-helper-panel]');
+        if (panel instanceof HTMLDetailsElement) {
+            panel.open = true;
+            panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        window.alert('The previous DM response requires a dice roll. Roll once before generating the next prompt.');
     }
 
     document.addEventListener('click', function (event) {
@@ -138,4 +254,13 @@
             handleDiceRoll(diceButton);
         }
     });
+
+    document.addEventListener('submit', function (event) {
+        const target = event.target;
+        if (target instanceof HTMLFormElement && target.classList.contains('next-action-form')) {
+            validateNextActionForm(target, event);
+        }
+    });
+
+    initializeDiceHelpers();
 }());

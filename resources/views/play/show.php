@@ -5,6 +5,8 @@
 /** @var array<string, mixed>|null $pendingDelta */
 /** @var array<int, array<string, mixed>> $timeline */
 /** @var string $latestNarrativeHtml */
+/** @var array<string, mixed> $rollRequirement */
+/** @var string $rollContextKey */
 $selectedLanguage = $selectedLanguage ?? $app->translator()->locale();
 ?>
 <section class="page-header compact-page-header">
@@ -85,7 +87,11 @@ $selectedLanguage = $selectedLanguage ?? $app->translator()->locale();
             <article class="card workflow-card primary-workflow-card next-turn-card">
                 <div class="step-label">Next turn</div>
                 <h2>What do you do next?</h2>
-                <p class="muted-text">Write the next player action or request. If the previous response asked for a roll, use the dice helper before generating the prompt.</p>
+                <?php if (!empty($rollRequirement['required'])): ?>
+                    <div class="alert alert-warning"><strong>Roll required.</strong> <?= e((string) $rollRequirement['summary']) ?></div>
+                <?php else: ?>
+                    <p class="muted-text">Write the next player action or request. Use the dice helper only when the previous response asked for a check.</p>
+                <?php endif; ?>
                 <?= App\Core\View::partial('partials/next_action_form', [
                     'app' => $app,
                     'campaign' => $campaign,
@@ -93,6 +99,11 @@ $selectedLanguage = $selectedLanguage ?? $app->translator()->locale();
                     'defaultNarrativeLength' => 'medium',
                     'defaultChallengeLevel' => 'balanced',
                     'defaultDicePolicy' => 'occasional',
+                    'rollRequired' => (bool) ($rollRequirement['required'] ?? false),
+                    'rollRequirementSummary' => (string) ($rollRequirement['summary'] ?? ''),
+                    'rollExpression' => (string) ($rollRequirement['expression'] ?? '1d20'),
+                    'rollReason' => (string) ($rollRequirement['reason'] ?? 'Requested check'),
+                    'rollContextKey' => $rollContextKey,
                     'buttonLabel' => 'Generate next prompt',
                 ]) ?>
             </article>

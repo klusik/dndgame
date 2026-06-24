@@ -12,6 +12,7 @@ use App\Repositories\PromptRepository;
 use App\Repositories\SessionRepository;
 use App\Services\FileStorage;
 use App\Services\MarkdownRenderer;
+use App\Services\RollRequirementDetector;
 
 /**
  * Campaign play workflow controller.
@@ -32,6 +33,8 @@ final class PlayController extends Controller
         $latestSession = $latestSessions[0] ?? null;
         $latestNarrative = $latestSession ? $storage->read((string) $latestSession['narrative_file']) : '';
         $latestNarrativeHtml = $latestNarrative !== '' ? (new MarkdownRenderer())->render($latestNarrative) : '';
+        $rollRequirement = (new RollRequirementDetector())->detect($latestNarrative);
+        $rollContextKey = $latestSession ? sprintf('campaign-%d-session-%d', (int) $campaign['id'], (int) $latestSession['id']) : sprintf('campaign-%d-empty', (int) $campaign['id']);
 
         $awaitingPrompt = $promptRepository->findLatestAwaitingResponse((int) $campaign['id']);
         $pendingDelta = $promptRepository->findLatestPendingDelta((int) $campaign['id']);
@@ -46,6 +49,8 @@ final class PlayController extends Controller
             'pendingDelta' => $pendingDelta,
             'timeline' => $timeline,
             'selectedLanguage' => $this->app->translator()->locale(),
+            'rollRequirement' => $rollRequirement,
+            'rollContextKey' => $rollContextKey,
         ]);
     }
 
