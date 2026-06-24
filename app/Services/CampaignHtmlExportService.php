@@ -51,6 +51,7 @@ final class CampaignHtmlExportService
         $storyTurns = $this->sessions->listByCampaignAscending($campaignId);
         $storyTurnIds = array_map(static fn (array $turn): int => (int) $turn['id'], $storyTurns);
         $turnEvents = $this->sessions->listEventsForSessions($campaignId, $storyTurnIds);
+        $fallbackInputs = $this->fallbackPlayerInputsForTurns($campaignId, $storyTurns, $turnEvents);
         $description = $this->storage->read((string) ($campaign['description_file'] ?? ''));
 
         return '<!doctype html>' . "\n"
@@ -60,7 +61,7 @@ final class CampaignHtmlExportService
             . '<main class="export-page">' . "\n"
             . $this->campaignHeader($campaign, count($storyTurns))
             . $this->descriptionSection($description)
-            . $this->storySection($storyTurns, $turnEvents)
+            . $this->storySection($storyTurns, $turnEvents, $fallbackInputs)
             . '</main>' . "\n"
             . '</body>' . "\n"
             . '</html>' . "\n";
@@ -118,8 +119,9 @@ final class CampaignHtmlExportService
      *
      * @param array<int, array<string, mixed>> $storyTurns
      * @param array<int, array<int, array<string, mixed>>> $turnEvents
+     * @param array<int, array{action:string,dice:string}> $fallbackInputs
      */
-    private function storySection(array $storyTurns, array $turnEvents): string
+    private function storySection(array $storyTurns, array $turnEvents, array $fallbackInputs): string
     {
         $html = '<section class="section-card story-section">'
             . '<div class="section-heading">'
@@ -137,8 +139,9 @@ final class CampaignHtmlExportService
             $narrative = $this->storage->read((string) $turn['narrative_file']);
             $raw = $this->storage->read((string) $turn['raw_transcript_file']);
             $playerInput = $this->playerInputFromEvents($turnEvents[$turnId] ?? []);
-            $playerAction = trim($playerInput['action']);
-            $diceResults = trim($playerInput['dice']);
+            $fallbackInput = $fallbackInputs[$turnId] ?? ['action' => '', 'dice' => ''];
+            $playerAction = trim($playerInput['action'] !== '' ? $playerInput['action'] : $fallbackInput['action']);
+            $diceResults = trim($playerInput['dice'] !== '' ? $playerInput['dice'] : $fallbackInput['dice']);
 
             $html .= '<article class="story-turn">'
                 . '<header class="turn-header">'
@@ -167,6 +170,168 @@ final class CampaignHtmlExportService
         }
 
         return $html . '</section>' . "\n";
+    }
+
+
+    /**
+     * Build fallback player inputs for old story turns lacking explicit events.
+     *
+     * New story turns store player input directly as session_events. Older turns
+     * may not have those rows, so the export first recovers input through the
+     * exact prompt-response-delta-session relation. If that relation is missing,
+     * it uses campaign-local prompt creation times as a conservative fallback.
+     *
+     * @param array<int, array<string, mixed>> $storyTurns
+     * @param array<int, array<int, array<string, mixed>>> $turnEvents
+     * @return array<int, array{action:string,dice:string}>
+     */
+    private function fallbackPlayerInputsForTurns(int $campaignId, array $storyTurns, array $turnEvents): array
+    {
+        $inputs = [];
+        $turnsNeedingFallback = [];
+
+        foreach ($storyTurns as $turn) {
+            $turnId = (int) $turn['id'];
+            $storedInput = $this->playerInputFromEvents($turnEvents[$turnId] ?? []);
+            if ($storedInput['action'] === '' && $storedInput['dice'] === '') {
+                $turnsNeedingFallback[$turnId] = $turn;
+            }
+        }
+
+        if ($turnsNeedingFallback === []) {
+            return [];
+        }
+
+        $usedPromptIds = [];
+        foreach ($this->prompts->listPromptInputsLinkedToSessions($campaignId) as $row) {
+            $turnId = (int) ($row['session_id'] ?? 0);
+            $promptId = (int) ($row['prompt_id'] ?? 0);
+            if ($promptId > 0) {
+                $usedPromptIds[$promptId] = true;
+            }
+            if ($turnId <= 0 || $promptId <= 0 || !isset($turnsNeedingFallback[$turnId])) {
+                continue;
+            }
+
+            $input = $this->extractPlayerInputFromPromptRow($row);
+            if ($input['action'] === '' && $input['dice'] === '') {
+                continue;
+            }
+
+            $inputs[$turnId] = $input;
+            unset($turnsNeedingFallback[$turnId]);
+        }
+
+        if ($turnsNeedingFallback === []) {
+            return $inputs;
+        }
+
+        $timelineInputs = $this->timestampFallbackPlayerInputs($campaignId, array_values($turnsNeedingFallback), $usedPromptIds);
+        foreach ($timelineInputs as $turnId => $input) {
+            if (!isset($inputs[$turnId])) {
+                $inputs[$turnId] = $input;
+            }
+        }
+
+        return $inputs;
+    }
+
+    /**
+     * Pair remaining story turns with prompt input by campaign-local timestamps.
+     *
+     * This fallback is intentionally conservative. It walks turns in reading
+     * order and assigns the newest unused prompt created before the turn was
+     * stored. Older unused prompts before that prompt are consumed as abandoned
+     * or superseded drafts, so they cannot leak into later turns.
+     *
+     * @param array<int, array<string, mixed>> $storyTurns
+     * @param array<int, bool> $usedPromptIds
+     * @return array<int, array{action:string,dice:string}>
+     */
+    private function timestampFallbackPlayerInputs(int $campaignId, array $storyTurns, array $usedPromptIds): array
+    {
+        $inputs = [];
+        $promptRows = [];
+
+        foreach ($this->prompts->listPromptsByCampaignAscending($campaignId) as $row) {
+            $promptId = (int) ($row['id'] ?? 0);
+            if ($promptId <= 0 || isset($usedPromptIds[$promptId])) {
+                continue;
+            }
+
+            $input = $this->extractPlayerInputFromPromptRow($row);
+            if ($input['action'] === '' && $input['dice'] === '') {
+                continue;
+            }
+
+            $row['extracted_input'] = $input;
+            $promptRows[] = $row;
+        }
+
+        if ($promptRows === []) {
+            return [];
+        }
+
+        usort($storyTurns, static function (array $left, array $right): int {
+            $leftDate = (string) ($left['created_at'] ?? '');
+            $rightDate = (string) ($right['created_at'] ?? '');
+            $dateComparison = strcmp($leftDate, $rightDate);
+            if ($dateComparison !== 0) {
+                return $dateComparison;
+            }
+            return (int) ($left['sequence_number'] ?? 0) <=> (int) ($right['sequence_number'] ?? 0);
+        });
+
+        $cursor = 0;
+        $promptCount = count($promptRows);
+        foreach ($storyTurns as $turn) {
+            $turnId = (int) ($turn['id'] ?? 0);
+            if ($turnId <= 0) {
+                continue;
+            }
+
+            $candidateIndex = null;
+            $turnCreatedAt = (string) ($turn['created_at'] ?? '');
+            for ($index = $cursor; $index < $promptCount; $index++) {
+                $promptCreatedAt = (string) ($promptRows[$index]['created_at'] ?? '');
+                if ($turnCreatedAt !== '' && $promptCreatedAt !== '' && strcmp($promptCreatedAt, $turnCreatedAt) > 0) {
+                    break;
+                }
+                $candidateIndex = $index;
+            }
+
+            if ($candidateIndex === null) {
+                continue;
+            }
+
+            /** @var array{action:string,dice:string} $input */
+            $input = $promptRows[$candidateIndex]['extracted_input'];
+            $inputs[$turnId] = $input;
+            $cursor = $candidateIndex + 1;
+        }
+
+        return $inputs;
+    }
+
+    /**
+     * Extract player-visible input from a generated prompt metadata row.
+     *
+     * @param array<string, mixed> $row
+     * @return array{action:string,dice:string}
+     */
+    private function extractPlayerInputFromPromptRow(array $row): array
+    {
+        $promptFile = trim((string) ($row['prompt_file'] ?? ''));
+        if ($promptFile === '') {
+            return ['action' => '', 'dice' => ''];
+        }
+
+        $promptText = $this->storage->read($promptFile);
+        if (trim($promptText) === '') {
+            return ['action' => '', 'dice' => ''];
+        }
+
+        return (new PlayerInputExtractor())->extractFromPrompt($promptText);
     }
 
     /**

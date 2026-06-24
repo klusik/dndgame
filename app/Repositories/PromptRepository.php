@@ -225,6 +225,55 @@ final class PromptRepository extends BaseRepository
         return $combined;
     }
 
+
+    /**
+     * List generated prompts linked to applied story turns through responses and deltas.
+     *
+     * This is used by readable exports to recover player actions for older turns
+     * that were created before player_action events were stored explicitly.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listPromptInputsLinkedToSessions(int $campaignId): array
+    {
+        $stmt = $this->pdo()->prepare(
+            'SELECT
+                s.id AS session_id,
+                s.sequence_number AS session_sequence_number,
+                s.created_at AS session_created_at,
+                gp.id AS prompt_id,
+                gp.prompt_file,
+                gp.created_at AS prompt_created_at,
+                cr.id AS response_id,
+                cr.created_at AS response_created_at
+             FROM sessions s
+             INNER JOIN state_deltas sd ON sd.applied_session_id = s.id
+             INNER JOIN chatgpt_responses cr ON cr.id = sd.source_response_id
+             INNER JOIN generated_prompts gp ON gp.id = cr.generated_prompt_id
+             WHERE s.campaign_id = :campaign_id
+             ORDER BY s.sequence_number ASC, s.id ASC, gp.created_at ASC, gp.id ASC'
+        );
+        $stmt->execute(['campaign_id' => $campaignId]);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * List generated prompts in creation order for timestamp-based export fallback.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listPromptsByCampaignAscending(int $campaignId): array
+    {
+        $stmt = $this->pdo()->prepare(
+            'SELECT id, campaign_id, session_id, title, prompt_file, prompt_hash, estimated_length, created_at
+             FROM generated_prompts
+             WHERE campaign_id = :campaign_id
+             ORDER BY created_at ASC, id ASC'
+        );
+        $stmt->execute(['campaign_id' => $campaignId]);
+        return $stmt->fetchAll();
+    }
+
     /**
      * Mark a delta as applied.
      */
