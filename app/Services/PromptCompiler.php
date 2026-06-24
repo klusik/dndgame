@@ -68,6 +68,16 @@ Campaign isolation and data hygiene:
 Narrative length and pacing:
 {$lengthInstruction}
 
+Readable narrative formatting:
+- Use clean Markdown inside [BEGIN_NARRATIVE].
+- Use ## or ### headings when the response has distinct sections or diagnostics.
+- Use **bold labels** for important status values, consequences, warnings, and item names.
+- Use *italics* sparingly for emphasis, not for whole paragraphs.
+- Use bullet lists for diagnostics, inventories, options, or discovered subsystems.
+- Use fenced code blocks only for exact terminal output, file contents, command output, or machine logs.
+- Do not use Markdown blockquote markers (>) for diagnostic lists or system readouts. They are reserved only for real quoted text.
+- Do not put every sentence into its own paragraph. Group related sentences into compact readable paragraphs.
+
 Challenge and consequence calibration:
 {$challengeInstruction}
 
