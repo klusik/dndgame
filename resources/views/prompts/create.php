@@ -21,6 +21,7 @@ $selectedLanguage = $responseLanguage ?? $app->translator()->locale();
         'defaultDicePolicy' => $defaultDicePolicy ?? 'occasional',
         'defaultAgencyMode' => $defaultAgencyMode ?? 'player_led',
         'defaultDescriptionStyle' => $defaultDescriptionStyle ?? 'direct',
+        'defaultDmStance' => $defaultDmStance ?? 'guarded',
         'buttonLabel' => 'Generate copy-ready prompt',
         'userAction' => $userAction ?? '',
         'extraNotes' => $extraNotes ?? '',

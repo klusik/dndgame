@@ -29,6 +29,7 @@ final class PromptCompiler
         string $dicePolicy = 'occasional',
         string $agencyMode = 'player_led',
         string $descriptionStyle = 'direct',
+        string $dmStance = 'guarded',
         string $diceResults = ''
     ): string {
         $context = $this->contextPacks->build($campaignId);
@@ -39,6 +40,7 @@ final class PromptCompiler
         $diceInstruction = $this->diceInstruction($dicePolicy);
         $agencyInstruction = $this->agencyInstruction($agencyMode);
         $descriptionInstruction = $this->descriptionInstruction($descriptionStyle);
+        $dmStanceInstruction = $this->dmStanceInstruction($dmStance);
         $diceSection = $this->diceSection($diceResults);
 
         return trim(<<<PROMPT
@@ -85,6 +87,9 @@ Readable narrative formatting:
 Challenge and consequence calibration:
 {$challengeInstruction}
 
+DM stance and fallibility:
+{$dmStanceInstruction}
+
 Player agency and action boundaries:
 {$agencyInstruction}
 
@@ -106,8 +111,9 @@ Response requirements:
 3. Do not reveal future outcomes before the player commits to an action.
 4. Preserve uncertainty. If something is inferred, mark it as inferred in the state delta.
 5. Avoid making every reasonable player idea automatically succeed. Use uncertainty, partial success, costs, limited information, or mild complications when appropriate.
-6. Return exactly this format.
-7. Always include [BEGIN_STATE_DELTA_JSON], even when the narrative only asks the player what they do next. Use empty arrays when nothing changed.
+6. Do not automatically confirm player theories. Record uncertain assumptions as assumptions, labels, or notes unless the character has evidence.
+7. Return exactly this format.
+8. Always include [BEGIN_STATE_DELTA_JSON], even when the narrative only asks the player what they do next. Use empty arrays when nothing changed.
 
 [BEGIN_NARRATIVE]
 Your narrative response for the user goes here.
@@ -150,6 +156,30 @@ PROMPT);
             'gentle' => '- Use mostly forgiving outcomes. Add complications only when the action is risky, rushed, poorly specified, or opposed.',
             'demanding' => '- Use firmer resistance. Risky actions can fail, consume resources, reveal danger, or require a check. Never punish without giving readable signals or alternatives.',
             default => '- Use balanced resistance. Good plans should help, but not guarantee success. Early campaign consequences should usually be mild, partial, or reversible unless the player clearly takes a major risk.',
+        };
+    }
+
+
+    /**
+     * Return model-facing instructions for how much the DM should challenge player assumptions.
+     */
+    private function dmStanceInstruction(string $stance): string
+    {
+        $base = implode("\n", [
+            '- Act as the world and its systems, not as a helpful assistant validating the player.',
+            '- Do not praise, confirm, or optimize the player plan unless the character has actually earned that information through observation, tools, checks, or clear prior facts.',
+            '- If the player makes a plausible but unverified assumption, let the character act on that assumption without correcting it out of character.',
+            '- Preserve false leads, decoys, inefficient routes, incomplete notes, ambiguous labels, and misunderstood evidence when they are plausible in-world.',
+            '- If the player says a paper probably contains passwords, you may write that the character copies the strings as possible passwords. Do not say they are passwords unless proven.',
+            '- Do not hint that a player assumption is wrong merely because the DM knows hidden truth. Reveal correction only through in-world evidence, failed use, later discovery, or a check result.',
+            '- Be fair. Do not lie about directly perceived facts, resolved mechanics, damage, inventory, dice results, or clearly readable text.',
+            '- Use state delta certainty carefully. Player assumptions should usually be suspected or inferred, not confirmed.',
+        ]);
+
+        return match ($stance) {
+            'straight' => $base . "\n" . '- Use a mostly transparent DM stance. Correct obvious misunderstandings when the character would notice them, but avoid meta hints.',
+            'shady' => $base . "\n" . '- Use a guarded and occasionally misleading stance. Let plausible wrong theories persist. Let false trails consume time or attention when that follows naturally from the world. Keep the misleading part subtle and in-world, never as a cheap gotcha.',
+            default => $base . "\n" . '- Use a guarded DM stance. Sometimes allow plausible wrong assumptions to stand. Sometimes answer only what the character can directly verify. This is the default mode.',
         };
     }
 

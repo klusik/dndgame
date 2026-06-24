@@ -7,6 +7,7 @@
  * @var string $defaultDicePolicy
  * @var string $defaultAgencyMode
  * @var string $defaultDescriptionStyle
+ * @var string $defaultDmStance
  * @var string $buttonLabel
  * @var string $placeholder
  * @var bool $rollRequired
@@ -21,6 +22,7 @@ $defaultChallengeLevel = $defaultChallengeLevel ?? 'balanced';
 $defaultDicePolicy = $defaultDicePolicy ?? 'occasional';
 $defaultAgencyMode = $defaultAgencyMode ?? 'player_led';
 $defaultDescriptionStyle = $defaultDescriptionStyle ?? 'direct';
+$defaultDmStance = $defaultDmStance ?? 'guarded';
 $buttonLabel = $buttonLabel ?? 'Generate next prompt';
 $placeholder = $placeholder ?? 'Describe only what your character attempts in this campaign. Example: I inspect the corridor carefully and listen for movement.';
 $rollRequired = (bool) ($rollRequired ?? false);
@@ -101,6 +103,13 @@ $diceResults = trim((string) ($diceResults ?? ''));
                 <option value="direct" <?= $defaultDescriptionStyle === 'direct' ? 'selected' : '' ?>>Direct</option>
                 <option value="plain" <?= $defaultDescriptionStyle === 'plain' ? 'selected' : '' ?>>Plain</option>
                 <option value="atmospheric" <?= $defaultDescriptionStyle === 'atmospheric' ? 'selected' : '' ?>>Atmospheric</option>
+            </select>
+        </label>
+        <label>DM stance
+            <select name="dm_stance">
+                <option value="straight" <?= $defaultDmStance === 'straight' ? 'selected' : '' ?>>Straight</option>
+                <option value="guarded" <?= $defaultDmStance === 'guarded' ? 'selected' : '' ?>>Guarded</option>
+                <option value="shady" <?= $defaultDmStance === 'shady' ? 'selected' : '' ?>>Shady</option>
             </select>
         </label>
     </div>

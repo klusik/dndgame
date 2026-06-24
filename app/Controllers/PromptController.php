@@ -48,6 +48,7 @@ final class PromptController extends Controller
         $dicePolicy = $this->normalizeDicePolicy((string) $request->input('dice_policy', 'occasional'));
         $agencyMode = $this->normalizeAgencyMode((string) $request->input('agency_mode', 'player_led'));
         $descriptionStyle = $this->normalizeDescriptionStyle((string) $request->input('description_style', 'direct'));
+        $dmStance = $this->normalizeDmStance((string) $request->input('dm_stance', 'guarded'));
         $rollRequirement = $this->latestRollRequirement((int) $campaign['id']);
         $errors = [];
         if ($userAction === '') {
@@ -69,6 +70,7 @@ final class PromptController extends Controller
                 'defaultDicePolicy' => $dicePolicy,
                 'defaultAgencyMode' => $agencyMode,
                 'defaultDescriptionStyle' => $descriptionStyle,
+                'defaultDmStance' => $dmStance,
                 'rollRequirement' => $rollRequirement,
                 'rollContextKey' => $this->latestRollContextKey((int) $campaign['id']),
             ]));
@@ -85,6 +87,7 @@ final class PromptController extends Controller
             $dicePolicy,
             $agencyMode,
             $descriptionStyle,
+            $dmStance,
             $diceResults
         );
         $storage = new FileStorage(APP_ROOT);
@@ -221,6 +224,14 @@ final class PromptController extends Controller
     private function normalizeDescriptionStyle(string $style): string
     {
         return in_array($style, ['direct', 'plain', 'atmospheric'], true) ? $style : 'direct';
+    }
+
+    /**
+     * Normalize a supported DM stance option.
+     */
+    private function normalizeDmStance(string $stance): string
+    {
+        return in_array($stance, ['straight', 'guarded', 'shady'], true) ? $stance : 'guarded';
     }
 
     /**
