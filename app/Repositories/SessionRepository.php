@@ -69,6 +69,27 @@ final class SessionRepository extends BaseRepository
         return $stmt->fetchAll();
     }
 
+
+    /**
+     * Find the latest story turn for a campaign.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function latest(int $campaignId): ?array
+    {
+        $rows = $this->recent($campaignId, 1);
+        return $rows[0] ?? null;
+    }
+
+    /**
+     * Check whether the given story turn is the campaign head.
+     */
+    public function isLatest(int $campaignId, int $sessionId): bool
+    {
+        $latest = $this->latest($campaignId);
+        return $latest !== null && (int) $latest['id'] === $sessionId;
+    }
+
     /**
      * List all sessions for a campaign.
      *

@@ -15,6 +15,7 @@
  * @var string $rollExpression
  * @var string $rollReason
  * @var string $rollContextKey
+ * @var int $sourceSessionId
  */
 $selectedLanguage = $selectedLanguage ?? $app->translator()->locale();
 $defaultNarrativeLength = $defaultNarrativeLength ?? 'medium';
@@ -31,9 +32,11 @@ $rollExpression = $rollExpression ?? '1d20';
 $rollReason = $rollReason ?? 'Requested check';
 $rollContextKey = $rollContextKey ?? ('campaign-' . $campaign['id'] . '-manual');
 $diceResults = trim((string) ($diceResults ?? ''));
+$sourceSessionId = (int) ($sourceSessionId ?? 0);
 ?>
 <form method="post" action="<?= e(url('/campaigns/' . $campaign['id'] . '/prompt')) ?>" class="next-action-form" data-roll-required="<?= $rollRequired ? '1' : '0' ?>">
     <?= App\Core\Csrf::field($app->session()) ?>
+    <input type="hidden" name="source_session_id" value="<?= $sourceSessionId ?>">
 
     <label>Player action or request
         <textarea name="user_action" rows="7" required autofocus placeholder="<?= e($placeholder) ?>"><?= e($userAction ?? '') ?></textarea>

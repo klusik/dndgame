@@ -109,6 +109,7 @@ $selectedLanguage = $selectedLanguage ?? $app->translator()->locale();
                     'rollExpression' => (string) ($rollRequirement['expression'] ?? '1d20'),
                     'rollReason' => (string) ($rollRequirement['reason'] ?? 'Requested check'),
                     'rollContextKey' => $rollContextKey,
+                    'sourceSessionId' => $latestSession !== null ? (int) $latestSession['id'] : 0,
                     'buttonLabel' => 'Generate next prompt',
                 ]) ?>
             </article>

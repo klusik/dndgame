@@ -45,7 +45,9 @@ final class SessionController extends Controller
         $storage = new FileStorage(APP_ROOT);
         $renderer = new MarkdownRenderer();
         $narrative = $storage->read((string) $session['narrative_file']);
-        $rollRequirement = (new RollRequirementDetector())->detect($narrative);
+        $latestSession = $repo->latest((int) $campaign['id']);
+        $isLatestTurn = $latestSession !== null && (int) $latestSession['id'] === (int) $session['id'];
+        $rollRequirement = $isLatestTurn ? (new RollRequirementDetector())->detect($narrative) : (new RollRequirementDetector())->detect('');
         $promptSettings = (new CampaignPromptSettingsService(new SettingRepository($this->app->database())))->getForCampaign((int) $campaign['id'], $this->app->translator()->locale());
         $rollContextKey = sprintf('campaign-%d-session-%d', (int) $campaign['id'], (int) $session['id']);
         return $this->render('sessions/show', [
@@ -56,6 +58,8 @@ final class SessionController extends Controller
             'rollRequirement' => $rollRequirement,
             'promptSettings' => $promptSettings,
             'rollContextKey' => $rollContextKey,
+            'latestSession' => $latestSession,
+            'isLatestTurn' => $isLatestTurn,
         ]);
     }
 

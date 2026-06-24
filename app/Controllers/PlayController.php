@@ -31,8 +31,7 @@ final class PlayController extends Controller
         $promptRepository = new PromptRepository($this->app->database());
         $sessionRepository = new SessionRepository($this->app->database());
 
-        $latestSessions = $sessionRepository->recent((int) $campaign['id'], 1);
-        $latestSession = $latestSessions[0] ?? null;
+        $latestSession = $sessionRepository->latest((int) $campaign['id']);
         $latestNarrative = $latestSession ? $storage->read((string) $latestSession['narrative_file']) : '';
         $latestNarrativeHtml = $latestNarrative !== '' ? (new MarkdownRenderer())->render($latestNarrative) : '';
         $rollRequirement = (new RollRequirementDetector())->detect($latestNarrative);

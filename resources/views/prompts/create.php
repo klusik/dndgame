@@ -31,5 +31,6 @@ $selectedLanguage = $responseLanguage ?? $app->translator()->locale();
         'rollExpression' => (string) (($rollRequirement['expression'] ?? '1d20')),
         'rollReason' => (string) (($rollRequirement['reason'] ?? 'Requested check')),
         'rollContextKey' => $rollContextKey ?? ('campaign-' . $campaign['id'] . '-prompt-create'),
+        'sourceSessionId' => (int) ($sourceSessionId ?? 0),
     ]) ?>
 </div>

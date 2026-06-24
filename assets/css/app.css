@@ -1014,3 +1014,17 @@ th {
     color: #1e3a8a;
 }
 
+
+.story-head-card {
+    border-color: #bfdbfe;
+    background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
+}
+
+.read-only-turn-card {
+    border-color: #e2e8f0;
+    background: #f8fafc;
+}
+
+.read-only-turn-card h2 {
+    color: #334155;
+}

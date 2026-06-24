@@ -44,6 +44,12 @@ final class PromptController extends Controller
         $userAction = trim((string) $request->input('user_action', ''));
         $extraNotes = trim((string) $request->input('extra_notes', ''));
         $diceResults = trim((string) $request->input('dice_results', ''));
+        $sourceSessionId = (int) $request->input('source_session_id', 0);
+        $sessionRepository = new SessionRepository($this->app->database());
+        $latestSession = $sessionRepository->latest((int) $campaign['id']);
+        $promptRepository = new PromptRepository($this->app->database());
+        $awaitingPrompt = $promptRepository->findLatestAwaitingResponse((int) $campaign['id']);
+        $pendingDelta = $promptRepository->findLatestPendingDelta((int) $campaign['id']);
         $promptSettings = $this->promptSettings()->fromInput([
             'response_language' => $request->input('response_language', $this->app->translator()->locale()),
             'narrative_length' => $request->input('narrative_length', 'medium'),
@@ -65,6 +71,18 @@ final class PromptController extends Controller
         if ($userAction === '') {
             $errors['user_action'] = 'Player action is required.';
         }
+        if ($awaitingPrompt !== null) {
+            $errors['open_prompt'] = 'A generated prompt is already waiting for a ChatGPT response. Finish that prompt before generating another one.';
+        }
+        if ($pendingDelta !== null) {
+            $errors['pending_delta'] = 'A state delta is waiting to be applied. Finish the current turn before generating another prompt.';
+        }
+        if ($latestSession !== null && $sourceSessionId !== (int) $latestSession['id']) {
+            $errors['source_session_id'] = 'Only the latest story turn can continue the campaign. Open the latest turn or the play workflow to continue.';
+        }
+        if ($latestSession === null && $sourceSessionId !== 0) {
+            $errors['source_session_id'] = 'This campaign has no story turns yet, so the first prompt must start from the campaign root.';
+        }
         if (($rollRequirement['required'] ?? false) && $diceResults === '') {
             $errors['dice_results'] = 'The previous DM response requires a dice roll before the next prompt can be generated.';
         }
@@ -85,6 +103,7 @@ final class PromptController extends Controller
                 'promptSettings' => $promptSettings,
                 'rollRequirement' => $rollRequirement,
                 'rollContextKey' => $this->latestRollContextKey((int) $campaign['id']),
+                'sourceSessionId' => $sourceSessionId,
             ]));
         }
 
@@ -113,10 +132,9 @@ final class PromptController extends Controller
         );
         $storage->write($promptPath, $prompt . "\n");
 
-        $repo = new PromptRepository($this->app->database());
-        $promptId = $repo->createPrompt(
+        $promptId = $promptRepository->createPrompt(
             (int) $campaign['id'],
-            null,
+            $latestSession !== null ? (int) $latestSession['id'] : null,
             mb_substr($userAction, 0, 120),
             $promptPath,
             hash('sha256', $prompt),
@@ -157,6 +175,7 @@ final class PromptController extends Controller
     {
         $campaignId = (int) $campaign['id'];
         $settings = $this->promptSettings()->getForCampaign($campaignId, $this->app->translator()->locale());
+        $latestSession = (new SessionRepository($this->app->database()))->latest($campaignId);
         return $overrides + [
             'campaign' => $campaign,
             'errors' => [],
@@ -170,6 +189,8 @@ final class PromptController extends Controller
             'defaultDmStance' => $settings['dm_stance'],
             'rollRequirement' => $this->latestRollRequirement($campaignId),
             'rollContextKey' => $this->latestRollContextKey($campaignId),
+            'sourceSessionId' => $latestSession !== null ? (int) $latestSession['id'] : 0,
+            'latestSession' => $latestSession,
         ];
     }
 
@@ -180,8 +201,7 @@ final class PromptController extends Controller
      */
     private function latestRollRequirement(int $campaignId): array
     {
-        $sessions = (new SessionRepository($this->app->database()))->recent($campaignId, 1);
-        $latestSession = $sessions[0] ?? null;
+        $latestSession = (new SessionRepository($this->app->database()))->latest($campaignId);
         if (!$latestSession) {
             return (new RollRequirementDetector())->detect('');
         }
@@ -196,8 +216,7 @@ final class PromptController extends Controller
      */
     private function latestRollContextKey(int $campaignId): string
     {
-        $sessions = (new SessionRepository($this->app->database()))->recent($campaignId, 1);
-        $latestSession = $sessions[0] ?? null;
+        $latestSession = (new SessionRepository($this->app->database()))->latest($campaignId);
         if (!$latestSession) {
             return sprintf('campaign-%d-empty', $campaignId);
         }
