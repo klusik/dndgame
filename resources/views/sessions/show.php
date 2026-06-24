@@ -5,15 +5,16 @@
 /** @var string $rawText */
 /** @var array<string, mixed> $rollRequirement */
 /** @var string $rollContextKey */
+/** @var array<string, string> $promptSettings */
 ?>
 <section class="page-header compact-page-header session-reader-header">
     <div>
-        <p class="eyebrow">Session <?= (int) $session['sequence_number'] ?></p>
+        <p class="eyebrow">Story turn <?= (int) $session['sequence_number'] ?></p>
         <h1><?= e($session['title']) ?></h1>
     </div>
     <div class="button-row">
         <a class="button" href="<?= e(url('/campaigns/' . $campaign['id'] . '/play')) ?>">Play workflow</a>
-        <a class="button" href="<?= e(url('/campaigns/' . $campaign['id'] . '/sessions')) ?>">All sessions</a>
+        <a class="button" href="<?= e(url('/campaigns/' . $campaign['id'] . '/sessions')) ?>">All story turns</a>
     </div>
 </section>
 
@@ -38,10 +39,13 @@
     <?= App\Core\View::partial('partials/next_action_form', [
         'app' => $app,
         'campaign' => $campaign,
-        'selectedLanguage' => $app->translator()->locale(),
-        'defaultNarrativeLength' => 'medium',
-        'defaultChallengeLevel' => 'balanced',
-        'defaultDicePolicy' => 'occasional',
+        'selectedLanguage' => $promptSettings['response_language'] ?? $app->translator()->locale(),
+        'defaultNarrativeLength' => $promptSettings['narrative_length'] ?? 'medium',
+        'defaultChallengeLevel' => $promptSettings['challenge_level'] ?? 'balanced',
+        'defaultDicePolicy' => $promptSettings['dice_policy'] ?? 'occasional',
+        'defaultAgencyMode' => $promptSettings['agency_mode'] ?? 'player_led',
+        'defaultDescriptionStyle' => $promptSettings['description_style'] ?? 'direct',
+        'defaultDmStance' => $promptSettings['dm_stance'] ?? 'guarded',
         'rollRequired' => (bool) ($rollRequirement['required'] ?? false),
         'rollRequirementSummary' => (string) ($rollRequirement['summary'] ?? ''),
         'rollExpression' => (string) ($rollRequirement['expression'] ?? '1d20'),

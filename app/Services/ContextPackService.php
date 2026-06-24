@@ -116,14 +116,14 @@ final class ContextPackService
         $lines[] = '';
 
         $recent = $this->sessions->recent($campaignId, 5);
-        $lines[] = '## Recent session summaries';
+        $lines[] = '## Recent story turn summaries';
         if ($recent === []) {
-            $lines[] = '- No sessions imported yet.';
+            $lines[] = '- No story turns imported yet.';
         } else {
             foreach (array_reverse($recent) as $session) {
                 $summary = trim($this->storage->read((string) $session['narrative_file']));
                 $summary = mb_substr($summary, 0, 1500);
-                $lines[] = '### Session ' . $session['sequence_number'] . ': ' . $session['title'];
+                $lines[] = '### Story turn ' . $session['sequence_number'] . ': ' . $session['title'];
                 $lines[] = $summary !== '' ? $summary : 'No narrative summary saved.';
                 $lines[] = '';
             }

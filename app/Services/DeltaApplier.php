@@ -33,7 +33,7 @@ final class DeltaApplier
     }
 
     /**
-     * Apply a pending delta and create a new session record.
+     * Apply a pending delta and create a new story turn record.
      */
     public function apply(int $campaignId, int $deltaId): int
     {
@@ -56,7 +56,7 @@ final class DeltaApplier
             throw new \RuntimeException('Stored delta JSON is invalid.');
         }
 
-        $title = trim((string) ($delta['session_title'] ?? 'Imported ChatGPT response'));
+        $title = trim((string) ($delta['turn_title'] ?? $delta['session_title'] ?? 'Imported ChatGPT response'));
         $title = $title !== '' ? $title : 'Imported ChatGPT response';
         $narrativeFile = (string) $deltaRow['narrative_file'];
         $responseFile = (string) $deltaRow['response_file'];

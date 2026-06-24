@@ -13,6 +13,8 @@ use App\Repositories\FactRepository;
 use App\Repositories\MysteryRepository;
 use App\Repositories\PromptRepository;
 use App\Repositories\SessionRepository;
+use App\Repositories\SettingRepository;
+use App\Services\CampaignPromptSettingsService;
 use App\Services\ContextPackService;
 use App\Services\FileStorage;
 use App\Services\PromptCompiler;
@@ -42,13 +44,22 @@ final class PromptController extends Controller
         $userAction = trim((string) $request->input('user_action', ''));
         $extraNotes = trim((string) $request->input('extra_notes', ''));
         $diceResults = trim((string) $request->input('dice_results', ''));
-        $responseLanguage = $this->normalizeLanguage((string) $request->input('response_language', $this->app->translator()->locale()));
-        $narrativeLength = $this->normalizeNarrativeLength((string) $request->input('narrative_length', 'medium'));
-        $challengeLevel = $this->normalizeChallengeLevel((string) $request->input('challenge_level', 'balanced'));
-        $dicePolicy = $this->normalizeDicePolicy((string) $request->input('dice_policy', 'occasional'));
-        $agencyMode = $this->normalizeAgencyMode((string) $request->input('agency_mode', 'player_led'));
-        $descriptionStyle = $this->normalizeDescriptionStyle((string) $request->input('description_style', 'direct'));
-        $dmStance = $this->normalizeDmStance((string) $request->input('dm_stance', 'guarded'));
+        $promptSettings = $this->promptSettings()->fromInput([
+            'response_language' => $request->input('response_language', $this->app->translator()->locale()),
+            'narrative_length' => $request->input('narrative_length', 'medium'),
+            'challenge_level' => $request->input('challenge_level', 'balanced'),
+            'dice_policy' => $request->input('dice_policy', 'occasional'),
+            'agency_mode' => $request->input('agency_mode', 'player_led'),
+            'description_style' => $request->input('description_style', 'direct'),
+            'dm_stance' => $request->input('dm_stance', 'guarded'),
+        ], $this->app->translator()->locale());
+        $responseLanguage = $promptSettings['response_language'];
+        $narrativeLength = $promptSettings['narrative_length'];
+        $challengeLevel = $promptSettings['challenge_level'];
+        $dicePolicy = $promptSettings['dice_policy'];
+        $agencyMode = $promptSettings['agency_mode'];
+        $descriptionStyle = $promptSettings['description_style'];
+        $dmStance = $promptSettings['dm_stance'];
         $rollRequirement = $this->latestRollRequirement((int) $campaign['id']);
         $errors = [];
         if ($userAction === '') {
@@ -71,10 +82,13 @@ final class PromptController extends Controller
                 'defaultAgencyMode' => $agencyMode,
                 'defaultDescriptionStyle' => $descriptionStyle,
                 'defaultDmStance' => $dmStance,
+                'promptSettings' => $promptSettings,
                 'rollRequirement' => $rollRequirement,
                 'rollContextKey' => $this->latestRollContextKey((int) $campaign['id']),
             ]));
         }
+
+        $this->promptSettings()->saveForCampaign((int) $campaign['id'], $promptSettings, $this->app->translator()->locale());
 
         $compiler = new PromptCompiler($this->contextPackService());
         $prompt = $compiler->compile(
@@ -137,9 +151,18 @@ final class PromptController extends Controller
     private function promptFormData(array $campaign, array $overrides = []): array
     {
         $campaignId = (int) $campaign['id'];
+        $settings = $this->promptSettings()->getForCampaign($campaignId, $this->app->translator()->locale());
         return $overrides + [
             'campaign' => $campaign,
             'errors' => [],
+            'promptSettings' => $settings,
+            'responseLanguage' => $settings['response_language'],
+            'defaultNarrativeLength' => $settings['narrative_length'],
+            'defaultChallengeLevel' => $settings['challenge_level'],
+            'defaultDicePolicy' => $settings['dice_policy'],
+            'defaultAgencyMode' => $settings['agency_mode'],
+            'defaultDescriptionStyle' => $settings['description_style'],
+            'defaultDmStance' => $settings['dm_stance'],
             'rollRequirement' => $this->latestRollRequirement($campaignId),
             'rollContextKey' => $this->latestRollContextKey($campaignId),
         ];
@@ -178,60 +201,11 @@ final class PromptController extends Controller
     }
 
     /**
-     * Normalize a supported response language code.
+     * Create campaign prompt settings service.
      */
-    private function normalizeLanguage(string $language): string
+    private function promptSettings(): CampaignPromptSettingsService
     {
-        return $language === 'cs' ? 'cs' : 'en';
-    }
-
-
-    /**
-     * Normalize a supported narrative length option.
-     */
-    private function normalizeNarrativeLength(string $length): string
-    {
-        return in_array($length, ['compact', 'medium', 'rich'], true) ? $length : 'medium';
-    }
-
-    /**
-     * Normalize a supported challenge level option.
-     */
-    private function normalizeChallengeLevel(string $level): string
-    {
-        return in_array($level, ['gentle', 'balanced', 'demanding'], true) ? $level : 'balanced';
-    }
-
-    /**
-     * Normalize a supported dice policy option.
-     */
-    private function normalizeDicePolicy(string $policy): string
-    {
-        return in_array($policy, ['rare', 'occasional', 'frequent'], true) ? $policy : 'occasional';
-    }
-
-    /**
-     * Normalize a supported player agency mode.
-     */
-    private function normalizeAgencyMode(string $mode): string
-    {
-        return in_array($mode, ['guided', 'player_led', 'sandbox'], true) ? $mode : 'player_led';
-    }
-
-    /**
-     * Normalize a supported description style option.
-     */
-    private function normalizeDescriptionStyle(string $style): string
-    {
-        return in_array($style, ['direct', 'plain', 'atmospheric'], true) ? $style : 'direct';
-    }
-
-    /**
-     * Normalize a supported DM stance option.
-     */
-    private function normalizeDmStance(string $stance): string
-    {
-        return in_array($stance, ['straight', 'guarded', 'shady'], true) ? $stance : 'guarded';
+        return new CampaignPromptSettingsService(new SettingRepository($this->app->database()));
     }
 
     /**

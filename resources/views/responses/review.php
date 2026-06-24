@@ -18,6 +18,6 @@
 </section>
 <form method="post" action="<?= e(url('/campaigns/' . $campaign['id'] . '/deltas/' . $delta['id'] . '/apply')) ?>" class="card review-actions">
     <?= App\Core\Csrf::field($app->session()) ?>
-    <p>Apply this delta, create a new session, and return directly to the next player action box?</p>
+    <p>Apply this delta, create a new story turn, and return directly to the next player action box?</p>
     <button class="button button-primary" type="submit">Apply and continue</button>
 </form>

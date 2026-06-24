@@ -17,5 +17,5 @@ return [
     'prompt.new' => 'Generate prompt',
     'response.import' => 'Import ChatGPT response',
     'facts.title' => 'Facts',
-    'sessions.title' => 'Sessions',
+    'sessions.title' => 'Story turns',
 ];

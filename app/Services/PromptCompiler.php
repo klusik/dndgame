@@ -260,8 +260,8 @@ PROMPT);
     private function deltaSchema(): string
     {
         return json_encode([
-            'session_title' => 'Short title for this response',
-            'session_summary' => 'One concise continuity summary of what changed.',
+            'turn_title' => 'Short title for this response',
+            'turn_summary' => 'One concise continuity summary of what changed.',
             'events' => [
                 [
                     'type' => 'event_type',

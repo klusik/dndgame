@@ -43,7 +43,7 @@ final class ImportController extends Controller
      * Store a pasted response and keep the play flow moving forward.
      *
      * Valid structured deltas are applied immediately by default. Responses
-     * without valid delta JSON are still stored as narrative-only sessions so
+     * without valid delta JSON are still stored as narrative-only story turns so
      * the player is not sent back to a stale waiting screen.
      */
     public function store(Request $request, string $id): Response
@@ -92,7 +92,7 @@ final class ImportController extends Controller
             );
             $this->app->session()->flash(
                 'warning',
-                'The response was saved as session #' . $sessionId . ', but no valid state delta was applied. Continue playing or regenerate a repair prompt later.'
+                'The response was saved as story turn #' . $sessionId . ', but no valid state delta was applied. Continue playing or regenerate a repair prompt later.'
             );
             return $this->redirect('/campaigns/' . $campaign['id'] . '/sessions/' . $sessionId);
         }
@@ -104,7 +104,7 @@ final class ImportController extends Controller
         }
 
         $sessionId = $this->deltaApplier()->apply((int) $campaign['id'], $deltaId);
-        $this->app->session()->flash('success', 'Response saved as session #' . $sessionId . '. Read it below, then continue with the next player action.');
+        $this->app->session()->flash('success', 'Response saved as story turn #' . $sessionId . '. Read it below, then continue with the next player action.');
         return $this->redirect('/campaigns/' . $campaign['id'] . '/sessions/' . $sessionId);
     }
 
@@ -137,7 +137,7 @@ final class ImportController extends Controller
         $this->requireCsrf($request);
         $campaign = $this->requireCampaign((int) $id);
         $sessionId = $this->deltaApplier()->apply((int) $campaign['id'], (int) $deltaId);
-        $this->app->session()->flash('success', 'State delta applied as session #' . $sessionId . '. Read it below, then continue with the next player action.');
+        $this->app->session()->flash('success', 'State delta applied as story turn #' . $sessionId . '. Read it below, then continue with the next player action.');
         return $this->redirect('/campaigns/' . $campaign['id'] . '/sessions/' . $sessionId);
     }
 
@@ -154,7 +154,7 @@ final class ImportController extends Controller
     }
 
     /**
-     * Store an unstructured response as a narrative-only session.
+     * Store an unstructured response as a narrative-only story turn.
      *
      * @param array<string, mixed> $campaign
      * @param array<int, string> $errors
@@ -198,8 +198,8 @@ final class ImportController extends Controller
     private function narrativeOnlyDelta(array $errors): array
     {
         return [
-            'session_title' => 'Unstructured ChatGPT response',
-            'session_summary' => 'The response was stored as narrative because it did not contain a valid state delta.',
+            'turn_title' => 'Unstructured ChatGPT response',
+            'turn_summary' => 'The response was stored as narrative because it did not contain a valid state delta.',
             'events' => [],
             'entities' => [],
             'facts' => [],

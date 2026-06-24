@@ -9,7 +9,7 @@
 </section>
 <section class="card-grid stats-grid">
     <article class="card stat-card"><span><?= (int) $stats['campaigns'] ?></span><p>Campaigns</p></article>
-    <article class="card stat-card"><span><?= (int) $stats['sessions'] ?></span><p>Sessions</p></article>
+    <article class="card stat-card"><span><?= (int) $stats['sessions'] ?></span><p>Story turns</p></article>
     <article class="card stat-card"><span><?= (int) $stats['facts'] ?></span><p>Indexed facts</p></article>
     <article class="card stat-card"><span><?= e((string) ($stats['last_activity'] ?? 'none')) ?></span><p>Last activity</p></article>
 </section>

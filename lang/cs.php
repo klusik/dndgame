@@ -17,5 +17,5 @@ return [
     'prompt.new' => 'Vygenerovat prompt',
     'response.import' => 'Importovat odpověď ChatGPT',
     'facts.title' => 'Fakta',
-    'sessions.title' => 'Sezení',
+    'sessions.title' => 'Herní tahy',
 ];

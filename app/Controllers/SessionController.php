@@ -9,6 +9,8 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Repositories\CampaignRepository;
 use App\Repositories\SessionRepository;
+use App\Repositories\SettingRepository;
+use App\Services\CampaignPromptSettingsService;
 use App\Services\FileStorage;
 use App\Services\MarkdownRenderer;
 use App\Services\RollRequirementDetector;
@@ -44,6 +46,7 @@ final class SessionController extends Controller
         $renderer = new MarkdownRenderer();
         $narrative = $storage->read((string) $session['narrative_file']);
         $rollRequirement = (new RollRequirementDetector())->detect($narrative);
+        $promptSettings = (new CampaignPromptSettingsService(new SettingRepository($this->app->database())))->getForCampaign((int) $campaign['id'], $this->app->translator()->locale());
         $rollContextKey = sprintf('campaign-%d-session-%d', (int) $campaign['id'], (int) $session['id']);
         return $this->render('sessions/show', [
             'campaign' => $campaign,
@@ -51,6 +54,7 @@ final class SessionController extends Controller
             'narrativeHtml' => $renderer->render($narrative),
             'rawText' => $storage->read((string) $session['raw_transcript_file']),
             'rollRequirement' => $rollRequirement,
+            'promptSettings' => $promptSettings,
             'rollContextKey' => $rollContextKey,
         ]);
     }

@@ -113,6 +113,7 @@ $diceResults = trim((string) ($diceResults ?? ''));
             </select>
         </label>
     </div>
+    <p class="muted-text compact-help-text">Prompt options are saved as campaign defaults after a prompt is generated.</p>
 
     <label>Extra operator notes
         <textarea name="extra_notes" rows="3" placeholder="Optional constraints for this one prompt."><?= e($extraNotes ?? '') ?></textarea>

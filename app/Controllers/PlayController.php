@@ -10,6 +10,8 @@ use App\Core\Response;
 use App\Repositories\CampaignRepository;
 use App\Repositories\PromptRepository;
 use App\Repositories\SessionRepository;
+use App\Repositories\SettingRepository;
+use App\Services\CampaignPromptSettingsService;
 use App\Services\FileStorage;
 use App\Services\MarkdownRenderer;
 use App\Services\RollRequirementDetector;
@@ -34,6 +36,7 @@ final class PlayController extends Controller
         $latestNarrative = $latestSession ? $storage->read((string) $latestSession['narrative_file']) : '';
         $latestNarrativeHtml = $latestNarrative !== '' ? (new MarkdownRenderer())->render($latestNarrative) : '';
         $rollRequirement = (new RollRequirementDetector())->detect($latestNarrative);
+        $promptSettings = (new CampaignPromptSettingsService(new SettingRepository($this->app->database())))->getForCampaign((int) $campaign['id'], $this->app->translator()->locale());
         $rollContextKey = $latestSession ? sprintf('campaign-%d-session-%d', (int) $campaign['id'], (int) $latestSession['id']) : sprintf('campaign-%d-empty', (int) $campaign['id']);
 
         $awaitingPrompt = $promptRepository->findLatestAwaitingResponse((int) $campaign['id']);
@@ -48,7 +51,8 @@ final class PlayController extends Controller
             'awaitingPrompt' => $awaitingPrompt,
             'pendingDelta' => $pendingDelta,
             'timeline' => $timeline,
-            'selectedLanguage' => $this->app->translator()->locale(),
+            'selectedLanguage' => $promptSettings['response_language'],
+            'promptSettings' => $promptSettings,
             'rollRequirement' => $rollRequirement,
             'rollContextKey' => $rollContextKey,
         ]);
