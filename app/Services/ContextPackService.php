@@ -60,6 +60,7 @@ final class ContextPackService
         $lines[] = '- Do not reveal hidden or DM-only information in narrative text.';
         $lines[] = '- Preserve uncertainty. Never turn suspicion into confirmation without evidence.';
         $lines[] = '- Preserve player agency. Do not choose consequential player actions unless the current player action explicitly commits to them.';
+        $lines[] = '- Use direct positive description. Avoid rhetorical negative contrast formulas such as not X but Y, not just X but Y, or stacked Not lines.';
         $lines[] = '- When a roll is requested, show the raw roll, all modifiers, and the final total.';
         $lines[] = '';
         $lines[] = '## Campaign description';

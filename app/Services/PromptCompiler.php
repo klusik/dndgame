@@ -91,6 +91,12 @@ Player agency and action boundaries:
 Direct description style:
 {$descriptionInstruction}
 
+Forbidden phrasing patterns:
+- Never use rhetorical negative contrast chains such as "not X, not Y, but Z", "not just X, but Y", "not only X, but Y", "it is not X, it is Y", "this is not X, it is Y", "less X and more Y", or similar constructions.
+- Do not build suspense by listing rejected interpretations before the useful fact.
+- Write the useful fact directly. Example: write "This is a low-level maintenance layer for diagnostics during primary system failure." Do not write "This is not a commander menu. It is a low-level maintenance layer."
+- Negative statements are allowed only for direct mechanical facts, failed checks, unavailable actions, safety limits, or explicit diagnostic output. They must not be used as a dramatic contrast formula.
+
 Checks and dice:
 {$diceInstruction}
 
@@ -174,17 +180,20 @@ PROMPT);
     private function descriptionInstruction(string $style): string
     {
         $base = implode("\n", [
-            '- Prefer direct positive description. State what the character sees, hears, learns, or can do.',
-            '- Avoid repeated negative contrast chains where several absent alternatives are listed before the actual answer.',
-            '- Use negative contrast only when the absence itself is actionable, surprising, dangerous, or a clue.',
-            '- Do not spend multiple lines listing what something is not when one direct sentence can say what it is.',
-            '- Replace vague dramatic contrast with playable information, concrete options, clear status, or a required check.',
+            '- Use direct positive description as a hard style rule, not a preference.',
+            '- State the useful fact first. Tell the player what the character sees, hears, learns, can do, cannot do, or must decide.',
+            '- Never use the common contrast formula where the text says what something is not before saying what it is.',
+            '- Forbidden patterns include: "not X, but Y", "not just X, but Y", "not only X, but Y", "not even X", "not a X, a Y", "less X and more Y", and stacked lines beginning with "Not".',
+            '- Rewrite contrast formulas into direct statements. Example: "The interface is a low-level maintenance layer for diagnostics during primary system failure."',
+            '- Negative facts are allowed only when they are direct mechanics: unavailable actions, failed checks, explicit errors, safety limits, missing inventory, or diagnostic output.',
+            '- If a negative fact is needed, write it once and move on. Do not pair it with a dramatic "but" reversal.',
+            '- Replace rhetorical setup with playable information, concrete options, clear status, or a required check.',
         ]);
 
         return match ($style) {
-            'plain' => $base . "\n" . '- Use a plain utilitarian style. Minimize metaphor and rhetorical setup. Prioritize useful information.',
-            'atmospheric' => $base . "\n" . '- Use atmosphere where it helps the scene, but keep descriptions concrete and do not use repetitive contrast patterns.',
-            default => $base . "\n" . '- Use direct narrative style. Some mood is acceptable, but the main job is to tell the player what is happening.',
+            'plain' => $base . "\n" . '- Use a plain utilitarian style. Avoid metaphor, rhetorical setup, and stylized contrast. Prioritize useful information.',
+            'atmospheric' => $base . "\n" . '- Use atmosphere only through concrete sensory detail. Do not use negative contrast as atmosphere.',
+            default => $base . "\n" . '- Use direct narrative style. Some mood is acceptable, but never through the forbidden contrast formulas.',
         };
     }
 
