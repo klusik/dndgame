@@ -105,7 +105,12 @@ final class PromptController extends Controller
             $diceResults
         );
         $storage = new FileStorage(APP_ROOT);
-        $promptPath = sprintf('%s/prompts/prompt-%s.md', $campaign['storage_path'], gmdate('Ymd-His'));
+        $promptPath = sprintf(
+            '%s/prompts/prompt-%s-%s.md',
+            $campaign['storage_path'],
+            gmdate('Ymd-His'),
+            bin2hex(random_bytes(3))
+        );
         $storage->write($promptPath, $prompt . "\n");
 
         $repo = new PromptRepository($this->app->database());

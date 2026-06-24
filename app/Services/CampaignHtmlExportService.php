@@ -49,8 +49,8 @@ final class CampaignHtmlExportService
         }
 
         $storyTurns = $this->sessions->listByCampaignAscending($campaignId);
-        $generationTimeline = array_reverse($this->prompts->listGenerationTimeline($campaignId));
-        $playerTurns = $this->playerTurnsBySession($generationTimeline);
+        $storyTurnIds = array_map(static fn (array $turn): int => (int) $turn['id'], $storyTurns);
+        $turnEvents = $this->sessions->listEventsForSessions($campaignId, $storyTurnIds);
         $description = $this->storage->read((string) ($campaign['description_file'] ?? ''));
 
         return '<!doctype html>' . "\n"
@@ -60,7 +60,7 @@ final class CampaignHtmlExportService
             . '<main class="export-page">' . "\n"
             . $this->campaignHeader($campaign, count($storyTurns))
             . $this->descriptionSection($description)
-            . $this->storySection($storyTurns, $playerTurns)
+            . $this->storySection($storyTurns, $turnEvents)
             . $this->readerSafetySection()
             . '</main>' . "\n"
             . '</body>' . "\n"
@@ -118,9 +118,9 @@ final class CampaignHtmlExportService
      * Render the readable story transcript with player actions inline.
      *
      * @param array<int, array<string, mixed>> $storyTurns
-     * @param array<int, array<string, string>> $playerTurns
+     * @param array<int, array<int, array<string, mixed>>> $turnEvents
      */
-    private function storySection(array $storyTurns, array $playerTurns): string
+    private function storySection(array $storyTurns, array $turnEvents): string
     {
         $html = '<section class="section-card story-section">'
             . '<div class="section-heading">'
@@ -137,9 +137,9 @@ final class CampaignHtmlExportService
             $turnId = (int) $turn['id'];
             $narrative = $this->storage->read((string) $turn['narrative_file']);
             $raw = $this->storage->read((string) $turn['raw_transcript_file']);
-            $playerTurn = $playerTurns[$turnId] ?? ['action' => '', 'dice' => ''];
-            $playerAction = trim($playerTurn['action']);
-            $diceResults = trim($playerTurn['dice']);
+            $playerInput = $this->playerInputFromEvents($turnEvents[$turnId] ?? []);
+            $playerAction = trim($playerInput['action']);
+            $diceResults = trim($playerInput['dice']);
 
             $html .= '<article class="story-turn">'
                 . '<header class="turn-header">'
@@ -182,75 +182,35 @@ final class CampaignHtmlExportService
     }
 
     /**
-     * Build a map from applied story turn ID to player input extracted from the generated prompt.
+     * Read stored player input events for one story turn.
      *
-     * @param array<int, array<string, mixed>> $timeline
-     * @return array<int, array<string, string>>
+     * @param array<int, array<string, mixed>> $events
+     * @return array{action:string,dice:string}
      */
-    private function playerTurnsBySession(array $timeline): array
+    private function playerInputFromEvents(array $events): array
     {
-        $mapped = [];
+        $input = ['action' => '', 'dice' => ''];
 
-        foreach ($timeline as $entry) {
-            $sessionId = (int) ($entry['session_id'] ?? 0);
-            if ($sessionId <= 0 || empty($entry['prompt_file'])) {
+        foreach ($events as $event) {
+            $eventType = (string) ($event['event_type'] ?? '');
+            if ($eventType !== 'player_action' && $eventType !== 'dice_result') {
                 continue;
             }
 
-            $prompt = $this->storage->read((string) $entry['prompt_file']);
-            $action = $this->extractSection(
-                $prompt,
-                'Current player action or request:',
-                ['[BEGIN_DICE_RESULTS]', 'Additional operator notes:']
-            );
-            $dice = $this->extractBracketedSection($prompt, 'BEGIN_DICE_RESULTS', 'END_DICE_RESULTS');
+            $text = trim($this->storage->read((string) ($event['description_file'] ?? '')));
+            if ($text === '') {
+                continue;
+            }
 
-            if ($action !== '' || $dice !== '') {
-                $mapped[$sessionId] = [
-                    'action' => $action,
-                    'dice' => $dice,
-                ];
+            if ($eventType === 'player_action' && $input['action'] === '') {
+                $input['action'] = $text;
+            }
+            if ($eventType === 'dice_result' && $input['dice'] === '') {
+                $input['dice'] = $text;
             }
         }
 
-        return $mapped;
-    }
-
-    /**
-     * Extract a free-text section from generated prompt text.
-     *
-     * @param array<int, string> $endMarkers
-     */
-    private function extractSection(string $text, string $startMarker, array $endMarkers): string
-    {
-        $start = strpos($text, $startMarker);
-        if ($start === false) {
-            return '';
-        }
-
-        $start += strlen($startMarker);
-        $end = strlen($text);
-        foreach ($endMarkers as $marker) {
-            $markerPosition = strpos($text, $marker, $start);
-            if ($markerPosition !== false && $markerPosition < $end) {
-                $end = $markerPosition;
-            }
-        }
-
-        return trim(substr($text, $start, $end - $start));
-    }
-
-    /**
-     * Extract a bracketed section from generated prompt text.
-     */
-    private function extractBracketedSection(string $text, string $beginMarker, string $endMarker): string
-    {
-        $pattern = '/\[' . preg_quote($beginMarker, '/') . '\](.*?)\[' . preg_quote($endMarker, '/') . '\]/s';
-        if (!preg_match($pattern, $text, $matches)) {
-            return '';
-        }
-
-        return trim((string) $matches[1]);
+        return $input;
     }
 
     /**

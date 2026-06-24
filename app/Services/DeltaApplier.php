@@ -61,6 +61,7 @@ final class DeltaApplier
         $narrativeFile = (string) $deltaRow['narrative_file'];
         $responseFile = (string) $deltaRow['response_file'];
         $sessionId = $this->sessions->create($campaignId, $title, $responseFile, $narrativeFile, (string) $deltaRow['delta_file']);
+        $this->storePlayerInputEvent($campaign, $campaignId, $sessionId, (int) ($deltaRow['generated_prompt_id'] ?? 0));
 
         $this->applyEntities($campaignId, $delta);
         $this->applyFacts($campaignId, $sessionId, $delta);
@@ -73,6 +74,40 @@ final class DeltaApplier
         $this->contextPacks->build($campaignId);
 
         return $sessionId;
+    }
+
+    /**
+     * Store the exact player input that produced this story turn.
+     *
+     * @param array<string, mixed> $campaign
+     */
+    private function storePlayerInputEvent(array $campaign, int $campaignId, int $sessionId, int $promptId): void
+    {
+        if ($promptId <= 0) {
+            return;
+        }
+
+        $prompt = $this->prompts->findPrompt($campaignId, $promptId);
+        if (!$prompt || empty($prompt['prompt_file'])) {
+            return;
+        }
+
+        $input = (new PlayerInputExtractor())->extractFromPrompt($this->storage->read((string) $prompt['prompt_file']));
+        $action = trim($input['action']);
+        $dice = trim($input['dice']);
+        $base = (string) $campaign['storage_path'];
+
+        if ($action !== '') {
+            $path = sprintf('%s/player-input/session-%04d-action.md', $base, $sessionId);
+            $this->storage->write($path, $action . "\n");
+            $this->sessions->createEvent($campaignId, $sessionId, 'player_action', 'Player action', $path, 'player');
+        }
+
+        if ($dice !== '') {
+            $path = sprintf('%s/player-input/session-%04d-dice.md', $base, $sessionId);
+            $this->storage->write($path, $dice . "\n");
+            $this->sessions->createEvent($campaignId, $sessionId, 'dice_result', 'Dice result', $path, 'player');
+        }
     }
 
     /**

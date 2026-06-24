@@ -18,6 +18,7 @@ use App\Services\ChatResponseParser;
 use App\Services\ContextPackService;
 use App\Services\DeltaApplier;
 use App\Services\FileStorage;
+use App\Services\PlayerInputExtractor;
 
 /**
  * Handles pasted ChatGPT responses and state delta processing.
@@ -66,7 +67,7 @@ final class ImportController extends Controller
         $storage = new FileStorage(APP_ROOT);
         $parser = new ChatResponseParser();
         $parsed = $parser->parse($responseText);
-        $stamp = gmdate('Ymd-His');
+        $stamp = gmdate('Ymd-His') . '-' . bin2hex(random_bytes(3));
         $base = (string) $campaign['storage_path'];
         $responseFile = $storage->write($base . '/responses/response-' . $stamp . '.md', $responseText . "\n");
         $narrativeFile = $storage->write($base . '/responses/narrative-' . $stamp . '.md', $parsed['narrative'] . "\n");
@@ -86,6 +87,7 @@ final class ImportController extends Controller
             $sessionId = $this->storeNarrativeOnlySession(
                 $campaign,
                 $responseId,
+                $promptId,
                 $responseFile,
                 $narrativeFile,
                 $parsed['errors']
@@ -159,13 +161,13 @@ final class ImportController extends Controller
      * @param array<string, mixed> $campaign
      * @param array<int, string> $errors
      */
-    private function storeNarrativeOnlySession(array $campaign, int $responseId, string $responseFile, string $narrativeFile, array $errors): int
+    private function storeNarrativeOnlySession(array $campaign, int $responseId, ?int $promptId, string $responseFile, string $narrativeFile, array $errors): int
     {
         $storage = new FileStorage(APP_ROOT);
         $repo = new PromptRepository($this->app->database());
         $sessions = new SessionRepository($this->app->database());
         $base = (string) $campaign['storage_path'];
-        $stamp = gmdate('Ymd-His');
+        $stamp = gmdate('Ymd-His') . '-' . bin2hex(random_bytes(3));
         $deltaFile = $storage->write(
             $base . '/deltas/narrative-only-' . $stamp . '.json',
             json_encode($this->narrativeOnlyDelta($errors), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n"
@@ -180,6 +182,7 @@ final class ImportController extends Controller
             $deltaFile
         );
         $repo->markDeltaApplied($deltaId, $sessionId);
+        $this->storeNarrativeOnlyPlayerInput($campaign, $sessionId, $promptId);
 
         $campaigns = new CampaignRepository($this->app->database());
         $campaigns->touch((int) $campaign['id']);
@@ -187,6 +190,41 @@ final class ImportController extends Controller
         $this->contextPackService()->build((int) $campaign['id']);
 
         return $sessionId;
+    }
+
+    /**
+     * Store player input for a narrative-only response when it is linked to a prompt.
+     *
+     * @param array<string, mixed> $campaign
+     */
+    private function storeNarrativeOnlyPlayerInput(array $campaign, int $sessionId, ?int $promptId): void
+    {
+        if ($promptId === null || $promptId <= 0) {
+            return;
+        }
+
+        $repo = new PromptRepository($this->app->database());
+        $prompt = $repo->findPrompt((int) $campaign['id'], $promptId);
+        if (!$prompt || empty($prompt['prompt_file'])) {
+            return;
+        }
+
+        $storage = new FileStorage(APP_ROOT);
+        $input = (new PlayerInputExtractor())->extractFromPrompt($storage->read((string) $prompt['prompt_file']));
+        $sessions = new SessionRepository($this->app->database());
+        $base = (string) $campaign['storage_path'];
+        $action = trim($input['action']);
+        $dice = trim($input['dice']);
+
+        if ($action !== '') {
+            $path = $storage->write(sprintf('%s/player-input/session-%04d-action.md', $base, $sessionId), $action . "\n");
+            $sessions->createEvent((int) $campaign['id'], $sessionId, 'player_action', 'Player action', $path, 'player');
+        }
+
+        if ($dice !== '') {
+            $path = $storage->write(sprintf('%s/player-input/session-%04d-dice.md', $base, $sessionId), $dice . "\n");
+            $sessions->createEvent((int) $campaign['id'], $sessionId, 'dice_result', 'Dice result', $path, 'player');
+        }
     }
 
     /**
