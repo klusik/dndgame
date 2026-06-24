@@ -12,12 +12,14 @@ use App\Repositories\PromptRepository;
 use App\Repositories\SessionRepository;
 
 /**
- * Builds a standalone readable HTML export of an entire campaign.
+ * Builds a standalone reader-safe HTML export of an entire campaign.
  *
- * The export intentionally contains inline CSS and no JavaScript so the file can
- * be archived, sent to another person, or opened outside the application. The
- * main story is rendered as readable prose, while raw prompts, responses, and
- * state deltas are preserved in collapsible archive sections.
+ * The export is intended for later reading, not for debugging the application.
+ * It therefore renders only the player-facing story transcript: player actions,
+ * supplied dice results, and DM narrative responses. Normalized state tables,
+ * raw prompts, context packs, and state delta JSON are intentionally omitted
+ * because they may contain internal variables, inferred truths, or hidden state
+ * that would spoil future campaign revelations.
  */
 final class CampaignHtmlExportService
 {
@@ -47,12 +49,8 @@ final class CampaignHtmlExportService
         }
 
         $storyTurns = $this->sessions->listByCampaignAscending($campaignId);
-        $turnEvents = $this->sessions->listEventsForSessions($campaignId, $this->ids($storyTurns));
         $generationTimeline = array_reverse($this->prompts->listGenerationTimeline($campaignId));
-        $entityRows = $this->entities->listByCampaign($campaignId);
-        $factRows = $this->facts->listCurrentByCampaign($campaignId, true);
-        $mysteryRows = $this->mysteries->listByCampaign($campaignId);
-        $clues = $this->mysteries->listCluesForMysteries($this->ids($mysteryRows));
+        $playerTurns = $this->playerTurnsBySession($generationTimeline);
         $description = $this->storage->read((string) ($campaign['description_file'] ?? ''));
 
         return '<!doctype html>' . "\n"
@@ -60,11 +58,10 @@ final class CampaignHtmlExportService
             . '<head>' . $this->head((string) $campaign['title']) . '</head>' . "\n"
             . '<body>' . "\n"
             . '<main class="export-page">' . "\n"
-            . $this->campaignHeader($campaign, count($storyTurns), count($factRows), count($entityRows), count($mysteryRows))
+            . $this->campaignHeader($campaign, count($storyTurns))
             . $this->descriptionSection($description)
-            . $this->storySection($storyTurns, $turnEvents)
-            . $this->stateSection($entityRows, $factRows, $mysteryRows, $clues)
-            . $this->archiveSection($generationTimeline)
+            . $this->storySection($storyTurns, $playerTurns)
+            . $this->readerSafetySection()
             . '</main>' . "\n"
             . '</body>' . "\n"
             . '</html>' . "\n";
@@ -82,11 +79,11 @@ final class CampaignHtmlExportService
     }
 
     /**
-     * Build the campaign title and stats header.
+     * Build the campaign title and reader-safe stats header.
      *
      * @param array<string, mixed> $campaign
      */
-    private function campaignHeader(array $campaign, int $turnCount, int $factCount, int $entityCount, int $mysteryCount): string
+    private function campaignHeader(array $campaign, int $turnCount): string
     {
         $generatedAt = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
 
@@ -96,9 +93,7 @@ final class CampaignHtmlExportService
             . '<p class="subtitle">Generated ' . e($generatedAt) . '</p>'
             . '<dl class="stats">'
             . '<div><dt>Story turns</dt><dd>' . $turnCount . '</dd></div>'
-            . '<div><dt>Facts</dt><dd>' . $factCount . '</dd></div>'
-            . '<div><dt>Entities</dt><dd>' . $entityCount . '</dd></div>'
-            . '<div><dt>Mysteries</dt><dd>' . $mysteryCount . '</dd></div>'
+            . '<div><dt>Export mode</dt><dd>Reader-safe</dd></div>'
             . '</dl>'
             . '</header>' . "\n";
     }
@@ -120,17 +115,18 @@ final class CampaignHtmlExportService
     }
 
     /**
-     * Render the readable story transcript.
+     * Render the readable story transcript with player actions inline.
      *
      * @param array<int, array<string, mixed>> $storyTurns
-     * @param array<int, array<int, array<string, mixed>>> $turnEvents
+     * @param array<int, array<string, string>> $playerTurns
      */
-    private function storySection(array $storyTurns, array $turnEvents): string
+    private function storySection(array $storyTurns, array $playerTurns): string
     {
         $html = '<section class="section-card story-section">'
             . '<div class="section-heading">'
             . '<p class="eyebrow">Readable transcript</p>'
             . '<h2>Story</h2>'
+            . '<p class="muted">Player actions and DM responses are shown directly in reading order.</p>'
             . '</div>';
 
         if ($storyTurns === []) {
@@ -141,204 +137,120 @@ final class CampaignHtmlExportService
             $turnId = (int) $turn['id'];
             $narrative = $this->storage->read((string) $turn['narrative_file']);
             $raw = $this->storage->read((string) $turn['raw_transcript_file']);
-            $delta = $this->storage->read((string) ($turn['state_delta_file'] ?? ''));
+            $playerTurn = $playerTurns[$turnId] ?? ['action' => '', 'dice' => ''];
+            $playerAction = trim($playerTurn['action']);
+            $diceResults = trim($playerTurn['dice']);
 
             $html .= '<article class="story-turn">'
                 . '<header class="turn-header">'
                 . '<p class="turn-number">Story turn ' . (int) $turn['sequence_number'] . '</p>'
                 . '<h3>' . e((string) $turn['title']) . '</h3>'
                 . '<p class="turn-date">' . e((string) $turn['created_at']) . '</p>'
-                . '</header>'
-                . '<div class="rendered-markdown narrative">' . $this->markdown->render($narrative !== '' ? $narrative : $raw) . '</div>'
-                . $this->eventList($turnEvents[$turnId] ?? []);
+                . '</header>';
 
-            if ($raw !== '' || $delta !== '') {
-                $html .= '<details class="archive-details">'
-                    . '<summary>Raw stored data for this turn</summary>'
-                    . ($raw !== '' ? '<h4>Raw ChatGPT response</h4><pre>' . e($raw) . '</pre>' : '')
-                    . ($delta !== '' ? '<h4>State delta JSON</h4><pre>' . e($delta) . '</pre>' : '')
-                    . '</details>';
+            if ($playerAction !== '' || $diceResults !== '') {
+                $html .= '<section class="speaker-card player-card">'
+                    . '<p class="speaker-label">Player</p>';
+                if ($playerAction !== '') {
+                    $html .= '<div class="rendered-markdown player-text">' . $this->markdown->render($playerAction) . '</div>';
+                }
+                if ($diceResults !== '') {
+                    $html .= '<div class="dice-result"><strong>Dice result:</strong><pre>' . e($diceResults) . '</pre></div>';
+                }
+                $html .= '</section>';
             }
 
-            $html .= '</article>';
+            $html .= '<section class="speaker-card dm-card">'
+                . '<p class="speaker-label">DM</p>'
+                . '<div class="rendered-markdown narrative">' . $this->markdown->render($narrative !== '' ? $narrative : $raw) . '</div>'
+                . '</section>'
+                . '</article>';
         }
 
         return $html . '</section>' . "\n";
     }
 
     /**
-     * Render event summaries stored for a story turn.
-     *
-     * @param array<int, array<string, mixed>> $events
+     * Render a note explaining why technical internals are not included.
      */
-    private function eventList(array $events): string
+    private function readerSafetySection(): string
     {
-        if ($events === []) {
-            return '';
-        }
-
-        $html = '<details class="event-details"><summary>Indexed events</summary><ul>';
-        foreach ($events as $event) {
-            $description = trim($this->storage->read((string) $event['description_file']));
-            $html .= '<li><strong>' . e((string) $event['title']) . '</strong>';
-            if ($description !== '') {
-                $html .= '<div class="rendered-markdown small-markdown">' . $this->markdown->render($description) . '</div>';
-            }
-            $html .= '</li>';
-        }
-        return $html . '</ul></details>';
-    }
-
-    /**
-     * Render current normalized campaign state.
-     *
-     * @param array<int, array<string, mixed>> $entities
-     * @param array<int, array<string, mixed>> $facts
-     * @param array<int, array<string, mixed>> $mysteries
-     * @param array<int, array<int, array<string, mixed>>> $clues
-     */
-    private function stateSection(array $entities, array $facts, array $mysteries, array $clues): string
-    {
-        return '<section class="section-card state-section">'
-            . '<div class="section-heading">'
-            . '<p class="eyebrow">Campaign memory</p>'
-            . '<h2>Current indexed state</h2>'
-            . '</div>'
-            . $this->entitiesTable($entities)
-            . $this->factsTable($facts)
-            . $this->mysteryList($mysteries, $clues)
+        return '<section class="section-card safety-section">'
+            . '<h2>Reader-safe export</h2>'
+            . '<p>This export intentionally omits raw prompts, context packs, state delta JSON, indexed variables, hidden flags, and internal campaign memory tables. Those structures are useful for application debugging, but they may reveal assumptions, future twists, hidden NPC relationships, or unresolved secrets.</p>'
             . '</section>' . "\n";
     }
 
     /**
-     * Render the entity table.
-     *
-     * @param array<int, array<string, mixed>> $entities
-     */
-    private function entitiesTable(array $entities): string
-    {
-        if ($entities === []) {
-            return '<h3>Entities</h3><p class="muted">No entities indexed.</p>';
-        }
-
-        $rows = '';
-        foreach ($entities as $entity) {
-            $rows .= '<tr><td>' . e((string) $entity['display_name']) . '</td>'
-                . '<td>' . e((string) $entity['type_code']) . '</td>'
-                . '<td>' . e((string) $entity['status']) . '</td>'
-                . '<td>' . e((string) $entity['visibility']) . '</td></tr>';
-        }
-
-        return '<h3>Entities</h3><div class="table-wrap"><table><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Visibility</th></tr></thead><tbody>'
-            . $rows . '</tbody></table></div>';
-    }
-
-    /**
-     * Render current facts.
-     *
-     * @param array<int, array<string, mixed>> $facts
-     */
-    private function factsTable(array $facts): string
-    {
-        if ($facts === []) {
-            return '<h3>Facts</h3><p class="muted">No facts indexed.</p>';
-        }
-
-        $rows = '';
-        foreach ($facts as $fact) {
-            $rows .= '<tr><td>' . e((string) $fact['category']) . '</td>'
-                . '<td>' . e((string) $fact['subject_text']) . '</td>'
-                . '<td>' . e((string) $fact['predicate']) . '</td>'
-                . '<td>' . e((string) $fact['value_text']) . '</td>'
-                . '<td>' . e((string) $fact['certainty']) . '</td>'
-                . '<td>' . e((string) $fact['visibility']) . '</td></tr>';
-        }
-
-        return '<h3>Facts</h3><div class="table-wrap"><table><thead><tr><th>Category</th><th>Subject</th><th>Predicate</th><th>Value</th><th>Certainty</th><th>Visibility</th></tr></thead><tbody>'
-            . $rows . '</tbody></table></div>';
-    }
-
-    /**
-     * Render mysteries and their clues.
-     *
-     * @param array<int, array<string, mixed>> $mysteries
-     * @param array<int, array<int, array<string, mixed>>> $clues
-     */
-    private function mysteryList(array $mysteries, array $clues): string
-    {
-        if ($mysteries === []) {
-            return '<h3>Mysteries</h3><p class="muted">No mysteries indexed.</p>';
-        }
-
-        $html = '<h3>Mysteries</h3><div class="mystery-list">';
-        foreach ($mysteries as $mystery) {
-            $mysteryId = (int) $mystery['id'];
-            $html .= '<article class="mystery-card">'
-                . '<h4>' . e((string) $mystery['title']) . '</h4>'
-                . '<p class="meta">Status: ' . e((string) $mystery['status']) . ' · Visibility: ' . e((string) $mystery['visibility']) . '</p>';
-            if (!empty($clues[$mysteryId])) {
-                $html .= '<ul>';
-                foreach ($clues[$mysteryId] as $clue) {
-                    $html .= '<li>' . e((string) $clue['clue_text']) . ' <span class="meta">(' . e((string) $clue['certainty']) . ')</span></li>';
-                }
-                $html .= '</ul>';
-            }
-            $html .= '</article>';
-        }
-        return $html . '</div>';
-    }
-
-    /**
-     * Render prompt and response archive.
+     * Build a map from applied story turn ID to player input extracted from the generated prompt.
      *
      * @param array<int, array<string, mixed>> $timeline
+     * @return array<int, array<string, string>>
      */
-    private function archiveSection(array $timeline): string
+    private function playerTurnsBySession(array $timeline): array
     {
-        $html = '<section class="section-card archive-section">'
-            . '<div class="section-heading">'
-            . '<p class="eyebrow">Technical archive</p>'
-            . '<h2>Prompts and responses</h2>'
-            . '<p class="muted">This section preserves the raw prompt workflow. It is collapsed by default because it is useful for auditing, not for normal reading.</p>'
-            . '</div>';
-
-        if ($timeline === []) {
-            return $html . '<p class="muted">No generated prompts or pasted responses stored.</p></section>' . "\n";
-        }
+        $mapped = [];
 
         foreach ($timeline as $entry) {
-            $title = (string) ($entry['prompt_title'] ?? $entry['session_title'] ?? 'Workflow item');
-            $prompt = $this->storage->read((string) ($entry['prompt_file'] ?? ''));
-            $response = $this->storage->read((string) ($entry['response_file'] ?? ''));
-            $narrative = $this->storage->read((string) ($entry['narrative_file'] ?? ''));
-            $delta = $this->storage->read((string) ($entry['delta_json_file'] ?? ''));
+            $sessionId = (int) ($entry['session_id'] ?? 0);
+            if ($sessionId <= 0 || empty($entry['prompt_file'])) {
+                continue;
+            }
 
-            $html .= '<details class="archive-details">'
-                . '<summary>' . e($title) . '</summary>'
-                . '<dl class="archive-meta">'
-                . '<div><dt>Prompt</dt><dd>' . e((string) ($entry['prompt_created_at'] ?? 'n/a')) . '</dd></div>'
-                . '<div><dt>Response</dt><dd>' . e((string) ($entry['response_created_at'] ?? 'n/a')) . '</dd></div>'
-                . '<div><dt>Parse status</dt><dd>' . e((string) ($entry['parse_status'] ?? 'n/a')) . '</dd></div>'
-                . '</dl>'
-                . ($prompt !== '' ? '<h4>Generated prompt</h4><pre>' . e($prompt) . '</pre>' : '')
-                . ($response !== '' ? '<h4>Pasted response</h4><pre>' . e($response) . '</pre>' : '')
-                . ($narrative !== '' ? '<h4>Extracted narrative</h4><div class="rendered-markdown">' . $this->markdown->render($narrative) . '</div>' : '')
-                . ($delta !== '' ? '<h4>State delta JSON</h4><pre>' . e($delta) . '</pre>' : '')
-                . '</details>';
+            $prompt = $this->storage->read((string) $entry['prompt_file']);
+            $action = $this->extractSection(
+                $prompt,
+                'Current player action or request:',
+                ['[BEGIN_DICE_RESULTS]', 'Additional operator notes:']
+            );
+            $dice = $this->extractBracketedSection($prompt, 'BEGIN_DICE_RESULTS', 'END_DICE_RESULTS');
+
+            if ($action !== '' || $dice !== '') {
+                $mapped[$sessionId] = [
+                    'action' => $action,
+                    'dice' => $dice,
+                ];
+            }
         }
 
-        return $html . '</section>' . "\n";
+        return $mapped;
     }
 
     /**
-     * Return integer IDs from database rows.
+     * Extract a free-text section from generated prompt text.
      *
-     * @param array<int, array<string, mixed>> $rows
-     * @return array<int, int>
+     * @param array<int, string> $endMarkers
      */
-    private function ids(array $rows): array
+    private function extractSection(string $text, string $startMarker, array $endMarkers): string
     {
-        return array_values(array_map(static fn (array $row): int => (int) $row['id'], $rows));
+        $start = strpos($text, $startMarker);
+        if ($start === false) {
+            return '';
+        }
+
+        $start += strlen($startMarker);
+        $end = strlen($text);
+        foreach ($endMarkers as $marker) {
+            $markerPosition = strpos($text, $marker, $start);
+            if ($markerPosition !== false && $markerPosition < $end) {
+                $end = $markerPosition;
+            }
+        }
+
+        return trim(substr($text, $start, $end - $start));
+    }
+
+    /**
+     * Extract a bracketed section from generated prompt text.
+     */
+    private function extractBracketedSection(string $text, string $beginMarker, string $endMarker): string
+    {
+        $pattern = '/\[' . preg_quote($beginMarker, '/') . '\](.*?)\[' . preg_quote($endMarker, '/') . '\]/s';
+        if (!preg_match($pattern, $text, $matches)) {
+            return '';
+        }
+
+        return trim((string) $matches[1]);
     }
 
     /**
@@ -357,8 +269,11 @@ final class CampaignHtmlExportService
     --soft: #eef2f7;
     --accent: #3858e9;
     --accent-soft: #e7ebff;
-    --code-bg: #111827;
-    --code-ink: #e5e7eb;
+    --player-bg: #f5f7ff;
+    --dm-bg: #ffffff;
+    --code-bg: #0b1220;
+    --code-ink: #dbeafe;
+    --code-border: #1e3a5f;
 }
 * { box-sizing: border-box; }
 body {
@@ -407,7 +322,7 @@ h4 { margin: 22px 0 8px; }
 .turn-date { color: var(--muted); }
 .stats {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 12px;
     margin: 28px 0 0;
 }
@@ -437,6 +352,33 @@ h4 { margin: 22px 0 8px; }
     color: var(--accent);
     font-weight: 800;
 }
+.speaker-card {
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 18px 20px;
+    margin: 18px 0;
+}
+.player-card {
+    background: var(--player-bg);
+    border-color: #cfd8ff;
+}
+.dm-card {
+    background: var(--dm-bg);
+}
+.speaker-label {
+    margin: 0 0 10px;
+    color: var(--accent);
+    font-size: 0.78rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+}
+.player-text {
+    font-weight: 520;
+}
+.dice-result {
+    margin-top: 14px;
+}
 .rendered-markdown p { margin: 0 0 1em; }
 .rendered-markdown ul,
 .rendered-markdown ol { padding-left: 1.4rem; }
@@ -458,11 +400,22 @@ pre {
     white-space: pre-wrap;
     background: var(--code-bg);
     color: var(--code-ink);
+    border: 1px solid var(--code-border);
     border-radius: 16px;
     padding: 16px;
-    line-height: 1.45;
+    line-height: 1.55;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
-pre code { background: transparent; padding: 0; }
+pre code,
+pre code * {
+    background: transparent !important;
+    color: var(--code-ink) !important;
+    border: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+}
+pre code { display: block; font-size: 0.94rem; }
 .readout-panel {
     border: 1px solid var(--line);
     background: #f8fafc;
@@ -474,62 +427,16 @@ pre code { background: transparent; padding: 0; }
     font-weight: 800;
     margin-bottom: 8px;
 }
-details {
-    border: 1px solid var(--line);
-    border-radius: 16px;
-    padding: 14px 16px;
-    margin-top: 18px;
+.safety-section {
     background: #fbfcfe;
 }
-summary {
-    cursor: pointer;
-    font-weight: 800;
-}
-.table-wrap { overflow-x: auto; }
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 12px 0 28px;
-    font-size: 0.93rem;
-}
-th,
-td {
-    border-bottom: 1px solid var(--line);
-    padding: 10px;
-    text-align: left;
-    vertical-align: top;
-}
-th { background: var(--soft); }
-.mystery-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 14px;
-}
-.mystery-card {
-    border: 1px solid var(--line);
-    border-radius: 16px;
-    padding: 16px;
-    background: #fbfcfe;
-}
-.archive-meta {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 10px;
-}
-.archive-meta div {
-    background: var(--soft);
-    border-radius: 12px;
-    padding: 10px;
-}
-.archive-meta dt { color: var(--muted); font-size: 0.78rem; }
-.archive-meta dd { margin: 0; font-weight: 700; }
 @media print {
     body { background: #fff; }
     .export-page { width: auto; padding: 0; }
     .hero,
     .section-card,
     .story-turn { box-shadow: none; break-inside: avoid; }
-    details { break-inside: avoid; }
+    .speaker-card { break-inside: avoid; }
 }
 CSS;
     }

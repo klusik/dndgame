@@ -975,3 +975,42 @@ th {
     background: #fffbeb;
     color: #713f12;
 }
+
+/* Console and diagnostic output readability.
+   This block intentionally sits near the end of the stylesheet so it wins over
+   generic inline code rules inside rendered narratives. */
+.rendered-markdown pre {
+    border: 1px solid #1e3a5f;
+    background: #0b1220;
+    color: #dbeafe;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 14px 32px rgba(15, 23, 42, 0.16);
+}
+
+.rendered-markdown pre code,
+.rendered-markdown pre code * {
+    border: 0 !important;
+    background: transparent !important;
+    color: #dbeafe !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+}
+
+.rendered-markdown pre code {
+    display: block;
+    font-size: 0.94rem;
+    line-height: 1.62;
+    tab-size: 4;
+}
+
+.rendered-markdown pre::selection,
+.rendered-markdown pre code::selection,
+.rendered-markdown pre code *::selection {
+    background: #2563eb;
+    color: #ffffff;
+}
+
+.rendered-markdown code {
+    color: #1e3a8a;
+}
+
