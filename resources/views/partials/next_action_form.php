@@ -5,6 +5,8 @@
  * @var string $defaultNarrativeLength
  * @var string $defaultChallengeLevel
  * @var string $defaultDicePolicy
+ * @var string $defaultAgencyMode
+ * @var string $defaultDescriptionStyle
  * @var string $buttonLabel
  * @var string $placeholder
  */
@@ -12,6 +14,8 @@ $selectedLanguage = $selectedLanguage ?? $app->translator()->locale();
 $defaultNarrativeLength = $defaultNarrativeLength ?? 'medium';
 $defaultChallengeLevel = $defaultChallengeLevel ?? 'balanced';
 $defaultDicePolicy = $defaultDicePolicy ?? 'occasional';
+$defaultAgencyMode = $defaultAgencyMode ?? 'player_led';
+$defaultDescriptionStyle = $defaultDescriptionStyle ?? 'direct';
 $buttonLabel = $buttonLabel ?? 'Generate next prompt';
 $placeholder = $placeholder ?? 'Describe only what your character attempts in this campaign. Example: I inspect the corridor carefully and listen for movement.';
 ?>
@@ -65,6 +69,20 @@ $placeholder = $placeholder ?? 'Describe only what your character attempts in th
                 <option value="rare" <?= $defaultDicePolicy === 'rare' ? 'selected' : '' ?>>Rare</option>
                 <option value="occasional" <?= $defaultDicePolicy === 'occasional' ? 'selected' : '' ?>>Occasional</option>
                 <option value="frequent" <?= $defaultDicePolicy === 'frequent' ? 'selected' : '' ?>>Frequent</option>
+            </select>
+        </label>
+        <label>Player agency
+            <select name="agency_mode">
+                <option value="guided" <?= $defaultAgencyMode === 'guided' ? 'selected' : '' ?>>Guided</option>
+                <option value="player_led" <?= $defaultAgencyMode === 'player_led' ? 'selected' : '' ?>>Player-led</option>
+                <option value="sandbox" <?= $defaultAgencyMode === 'sandbox' ? 'selected' : '' ?>>Open sandbox</option>
+            </select>
+        </label>
+        <label>Description style
+            <select name="description_style">
+                <option value="direct" <?= $defaultDescriptionStyle === 'direct' ? 'selected' : '' ?>>Direct</option>
+                <option value="plain" <?= $defaultDescriptionStyle === 'plain' ? 'selected' : '' ?>>Plain</option>
+                <option value="atmospheric" <?= $defaultDescriptionStyle === 'atmospheric' ? 'selected' : '' ?>>Atmospheric</option>
             </select>
         </label>
     </div>

@@ -27,6 +27,8 @@ final class PromptCompiler
         string $narrativeLength = 'medium',
         string $challengeLevel = 'balanced',
         string $dicePolicy = 'occasional',
+        string $agencyMode = 'player_led',
+        string $descriptionStyle = 'direct',
         string $diceResults = ''
     ): string {
         $context = $this->contextPacks->build($campaignId);
@@ -35,6 +37,8 @@ final class PromptCompiler
         $lengthInstruction = $this->lengthInstruction($narrativeLength);
         $challengeInstruction = $this->challengeInstruction($challengeLevel);
         $diceInstruction = $this->diceInstruction($dicePolicy);
+        $agencyInstruction = $this->agencyInstruction($agencyMode);
+        $descriptionInstruction = $this->descriptionInstruction($descriptionStyle);
         $diceSection = $this->diceSection($diceResults);
 
         return trim(<<<PROMPT
@@ -81,16 +85,23 @@ Readable narrative formatting:
 Challenge and consequence calibration:
 {$challengeInstruction}
 
+Player agency and action boundaries:
+{$agencyInstruction}
+
+Direct description style:
+{$descriptionInstruction}
+
 Checks and dice:
 {$diceInstruction}
 
 Response requirements:
 1. Continue the scene naturally and preserve existing tone and continuity.
-2. Do not reveal future outcomes before the player commits to an action.
-3. Preserve uncertainty. If something is inferred, mark it as inferred in the state delta.
-4. Avoid making every reasonable player idea automatically succeed. Use uncertainty, partial success, costs, limited information, or mild complications when appropriate.
-5. Return exactly this format.
-6. Always include [BEGIN_STATE_DELTA_JSON], even when the narrative only asks the player what they do next. Use empty arrays when nothing changed.
+2. Resolve only the current player action or request. Stop at the next meaningful choice, risk, uncertainty, resource decision, menu option, or tactical branch.
+3. Do not reveal future outcomes before the player commits to an action.
+4. Preserve uncertainty. If something is inferred, mark it as inferred in the state delta.
+5. Avoid making every reasonable player idea automatically succeed. Use uncertainty, partial success, costs, limited information, or mild complications when appropriate.
+6. Return exactly this format.
+7. Always include [BEGIN_STATE_DELTA_JSON], even when the narrative only asks the player what they do next. Use empty arrays when nothing changed.
 
 [BEGIN_NARRATIVE]
 Your narrative response for the user goes here.
@@ -133,6 +144,47 @@ PROMPT);
             'gentle' => '- Use mostly forgiving outcomes. Add complications only when the action is risky, rushed, poorly specified, or opposed.',
             'demanding' => '- Use firmer resistance. Risky actions can fail, consume resources, reveal danger, or require a check. Never punish without giving readable signals or alternatives.',
             default => '- Use balanced resistance. Good plans should help, but not guarantee success. Early campaign consequences should usually be mild, partial, or reversible unless the player clearly takes a major risk.',
+        };
+    }
+
+    /**
+     * Return model-facing instructions for how strongly the DM should preserve player agency.
+     */
+    private function agencyInstruction(string $mode): string
+    {
+        $base = implode("\n", [
+            '- Do not autoplay the player character. Do not choose menu options, routes, tools, dialogue lines, checks, or risk-taking actions for the player unless the current player action explicitly says to do that.',
+            '- If the player asks to inspect, search, diagnose, open a menu, read a screen, or look around, provide the discovered information and stop before choosing what they operate next.',
+            '- When a device, door, terminal, NPC, map, hazard, or mystery presents multiple plausible next steps, list concise options and ask what the player does.',
+            '- Do not chain several consequential player actions together. One player input should normally produce one resolved action plus the next decision point.',
+            '- You may narrate routine micro-actions needed to complete the stated action, such as sitting down before using a console. Do not narrate extra strategic decisions beyond the stated action.',
+            '- Bad example: the player says they return to the cockpit, so the DM also selects biometric rescan and opens a deeper recovery prompt. Good example: the DM shows the recovery options and asks which one the player chooses.',
+        ]);
+
+        return match ($mode) {
+            'guided' => $base . "\n" . '- Use a guided style. You may recommend one or two likely next steps, but still ask for confirmation before the character commits to them.',
+            'sandbox' => $base . "\n" . '- Use a very open style. Avoid recommendations unless the player asks. Present the situation, consequences, and available handles, then stop.',
+            default => $base . "\n" . '- Use a player-led style. Offer useful options when helpful, but keep the decision with the player. This is the default mode.',
+        };
+    }
+
+    /**
+     * Return model-facing instructions for concise direct description style.
+     */
+    private function descriptionInstruction(string $style): string
+    {
+        $base = implode("\n", [
+            '- Prefer direct positive description. State what the character sees, hears, learns, or can do.',
+            '- Avoid repeated negative contrast chains where several absent alternatives are listed before the actual answer.',
+            '- Use negative contrast only when the absence itself is actionable, surprising, dangerous, or a clue.',
+            '- Do not spend multiple lines listing what something is not when one direct sentence can say what it is.',
+            '- Replace vague dramatic contrast with playable information, concrete options, clear status, or a required check.',
+        ]);
+
+        return match ($style) {
+            'plain' => $base . "\n" . '- Use a plain utilitarian style. Minimize metaphor and rhetorical setup. Prioritize useful information.',
+            'atmospheric' => $base . "\n" . '- Use atmosphere where it helps the scene, but keep descriptions concrete and do not use repetitive contrast patterns.',
+            default => $base . "\n" . '- Use direct narrative style. Some mood is acceptable, but the main job is to tell the player what is happening.',
         };
     }
 

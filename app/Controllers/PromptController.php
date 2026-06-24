@@ -45,6 +45,8 @@ final class PromptController extends Controller
         $narrativeLength = $this->normalizeNarrativeLength((string) $request->input('narrative_length', 'medium'));
         $challengeLevel = $this->normalizeChallengeLevel((string) $request->input('challenge_level', 'balanced'));
         $dicePolicy = $this->normalizeDicePolicy((string) $request->input('dice_policy', 'occasional'));
+        $agencyMode = $this->normalizeAgencyMode((string) $request->input('agency_mode', 'player_led'));
+        $descriptionStyle = $this->normalizeDescriptionStyle((string) $request->input('description_style', 'direct'));
         if ($userAction === '') {
             return $this->render('prompts/create', [
                 'campaign' => $campaign,
@@ -56,6 +58,8 @@ final class PromptController extends Controller
                 'defaultNarrativeLength' => $narrativeLength,
                 'defaultChallengeLevel' => $challengeLevel,
                 'defaultDicePolicy' => $dicePolicy,
+                'defaultAgencyMode' => $agencyMode,
+                'defaultDescriptionStyle' => $descriptionStyle,
             ]);
         }
 
@@ -68,6 +72,8 @@ final class PromptController extends Controller
             $narrativeLength,
             $challengeLevel,
             $dicePolicy,
+            $agencyMode,
+            $descriptionStyle,
             $diceResults
         );
         $storage = new FileStorage(APP_ROOT);
@@ -137,6 +143,22 @@ final class PromptController extends Controller
     private function normalizeDicePolicy(string $policy): string
     {
         return in_array($policy, ['rare', 'occasional', 'frequent'], true) ? $policy : 'occasional';
+    }
+
+    /**
+     * Normalize a supported player agency mode.
+     */
+    private function normalizeAgencyMode(string $mode): string
+    {
+        return in_array($mode, ['guided', 'player_led', 'sandbox'], true) ? $mode : 'player_led';
+    }
+
+    /**
+     * Normalize a supported description style option.
+     */
+    private function normalizeDescriptionStyle(string $style): string
+    {
+        return in_array($style, ['direct', 'plain', 'atmospheric'], true) ? $style : 'direct';
     }
 
     /**
