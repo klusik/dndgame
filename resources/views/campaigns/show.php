@@ -11,6 +11,7 @@
         <a class="button button-primary" href="<?= e(url('/campaigns/' . $campaign['id'] . '/play')) ?>">Continue game</a>
         <a class="button" href="<?= e(url('/campaigns/' . $campaign['id'] . '/prompt/new')) ?>">Generate prompt</a>
         <a class="button" href="<?= e(url('/campaigns/' . $campaign['id'] . '/responses/new')) ?>">Import response</a>
+        <a class="button" href="<?= e(url('/campaigns/' . $campaign['id'] . '/export/html')) ?>">Export readable HTML</a>
     </div>
 </section>
 <section class="card-grid stats-grid">
@@ -25,4 +26,5 @@
     <a href="<?= e(url('/campaigns/' . $campaign['id'] . '/facts')) ?>">Facts</a>
     <a href="<?= e(url('/campaigns/' . $campaign['id'] . '/prompt/new')) ?>">Generate next prompt</a>
     <a href="<?= e(url('/campaigns/' . $campaign['id'] . '/responses/new')) ?>">Paste ChatGPT response</a>
+    <a href="<?= e(url('/campaigns/' . $campaign['id'] . '/export/html')) ?>">Export complete campaign HTML</a>
 </section>

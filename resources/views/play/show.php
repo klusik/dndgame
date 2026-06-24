@@ -18,6 +18,7 @@ $selectedLanguage = $selectedLanguage ?? $app->translator()->locale();
     <div class="button-row">
         <a class="button" href="<?= e(url('/campaigns/' . $campaign['id'])) ?>">Campaign overview</a>
         <a class="button" href="<?= e(url('/campaigns/' . $campaign['id'] . '/sessions')) ?>">Story turns</a>
+        <a class="button" href="<?= e(url('/campaigns/' . $campaign['id'] . '/export/html')) ?>">Export HTML</a>
     </div>
 </section>
 

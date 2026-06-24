@@ -7,6 +7,7 @@ namespace App\Core;
 use App\Controllers\AuthController;
 use App\Controllers\CampaignController;
 use App\Controllers\DashboardController;
+use App\Controllers\ExportController;
 use App\Controllers\FactController;
 use App\Controllers\HomeController;
 use App\Controllers\ImportController;
@@ -126,6 +127,7 @@ final class Application
         $this->router->get('/campaigns/{id}', CampaignController::class, 'show', true);
         $this->router->get('/campaigns/{id}/play', PlayController::class, 'show', true);
         $this->router->post('/campaigns/{id}/activate', CampaignController::class, 'activate', true);
+        $this->router->get('/campaigns/{id}/export/html', ExportController::class, 'html', true);
 
         $this->router->get('/campaigns/{id}/sessions', SessionController::class, 'index', true);
         $this->router->get('/campaigns/{id}/sessions/{sessionId}', SessionController::class, 'show', true);

@@ -69,6 +69,33 @@ final class MysteryRepository extends BaseRepository
     }
 
     /**
+     * List clues for a group of mysteries grouped by mystery ID.
+     *
+     * @param array<int, int> $mysteryIds
+     * @return array<int, array<int, array<string, mixed>>>
+     */
+    public function listCluesForMysteries(array $mysteryIds): array
+    {
+        $mysteryIds = array_values(array_unique(array_filter(array_map('intval', $mysteryIds), static fn (int $id): bool => $id > 0)));
+        if ($mysteryIds === []) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($mysteryIds), '?'));
+        $stmt = $this->pdo()->prepare(
+            'SELECT * FROM mystery_clues WHERE mystery_id IN (' . $placeholders . ') ORDER BY mystery_id ASC, created_at ASC, id ASC'
+        );
+        $stmt->execute($mysteryIds);
+
+        $grouped = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $grouped[(int) $row['mystery_id']][] = $row;
+        }
+
+        return $grouped;
+    }
+
+    /**
      * Count mysteries for a campaign.
      */
     public function countByCampaign(int $campaignId): int

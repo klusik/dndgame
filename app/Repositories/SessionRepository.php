@@ -82,6 +82,45 @@ final class SessionRepository extends BaseRepository
     }
 
     /**
+     * List all story turns for a campaign in reading order.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listByCampaignAscending(int $campaignId): array
+    {
+        $stmt = $this->pdo()->prepare('SELECT * FROM sessions WHERE campaign_id = :campaign_id ORDER BY sequence_number ASC');
+        $stmt->execute(['campaign_id' => $campaignId]);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * List indexed events for a group of story turns.
+     *
+     * @param array<int, int> $sessionIds
+     * @return array<int, array<int, array<string, mixed>>>
+     */
+    public function listEventsForSessions(int $campaignId, array $sessionIds): array
+    {
+        $sessionIds = array_values(array_unique(array_filter(array_map('intval', $sessionIds), static fn (int $id): bool => $id > 0)));
+        if ($sessionIds === []) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($sessionIds), '?'));
+        $stmt = $this->pdo()->prepare(
+            'SELECT * FROM session_events WHERE campaign_id = ? AND session_id IN (' . $placeholders . ') ORDER BY session_id ASC, id ASC'
+        );
+        $stmt->execute(array_merge([$campaignId], $sessionIds));
+
+        $grouped = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $grouped[(int) $row['session_id']][] = $row;
+        }
+
+        return $grouped;
+    }
+
+    /**
      * Find one session belonging to a campaign.
      *
      * @return array<string, mixed>|null
