@@ -61,7 +61,6 @@ final class CampaignHtmlExportService
             . $this->campaignHeader($campaign, count($storyTurns))
             . $this->descriptionSection($description)
             . $this->storySection($storyTurns, $turnEvents)
-            . $this->readerSafetySection()
             . '</main>' . "\n"
             . '</body>' . "\n"
             . '</html>' . "\n";
@@ -93,7 +92,7 @@ final class CampaignHtmlExportService
             . '<p class="subtitle">Generated ' . e($generatedAt) . '</p>'
             . '<dl class="stats">'
             . '<div><dt>Story turns</dt><dd>' . $turnCount . '</dd></div>'
-            . '<div><dt>Export mode</dt><dd>Reader-safe</dd></div>'
+            . '<div><dt>Export type</dt><dd>Readable story</dd></div>'
             . '</dl>'
             . '</header>' . "\n";
     }
@@ -168,17 +167,6 @@ final class CampaignHtmlExportService
         }
 
         return $html . '</section>' . "\n";
-    }
-
-    /**
-     * Render a note explaining why technical internals are not included.
-     */
-    private function readerSafetySection(): string
-    {
-        return '<section class="section-card safety-section">'
-            . '<h2>Reader-safe export</h2>'
-            . '<p>This export intentionally omits raw prompts, context packs, state delta JSON, indexed variables, hidden flags, and internal campaign memory tables. Those structures are useful for application debugging, but they may reveal assumptions, future twists, hidden NPC relationships, or unresolved secrets.</p>'
-            . '</section>' . "\n";
     }
 
     /**
