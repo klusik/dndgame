@@ -62,7 +62,8 @@ final class ContextPackService
         $lines[] = '- Preserve player agency. Do not choose consequential player actions unless the current player action explicitly commits to them.';
         $lines[] = '- Use direct positive description. Avoid rhetorical negative contrast formulas such as not X but Y, not just X but Y, or stacked Not lines.';
         $lines[] = '- Do not automatically validate player theories. Plausible but unverified assumptions may remain uncorrected until evidence, checks, or consequences reveal more.';
-        $lines[] = '- When a roll is requested, show the raw roll, all modifiers, and the final total.';
+        $lines[] = '- When a roll is requested, show the raw roll, all modifiers, and the final total.
+- Keep player-facing journal data current using objective, job, goal, task, and mystery facts. Never include hidden or DM-only objectives.';
         $lines[] = '';
         $lines[] = '## Campaign description';
         $lines[] = trim($this->storage->read((string) $campaign['description_file'])) ?: 'No description saved yet.';

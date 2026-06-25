@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Core\Controller;
 use App\Core\Request;
 use App\Core\Response;
+use App\Repositories\SettingRepository;
 
 /**
  * User-facing settings controller.
@@ -18,7 +19,12 @@ final class SettingsController extends Controller
      */
     public function index(Request $request): Response
     {
-        return $this->render('settings/index');
+        $settings = new SettingRepository($this->app->database());
+        return $this->render('settings/index', [
+            'githubRepository' => $settings->get('updater.github_repository', ''),
+            'lastUpdateRef' => $settings->get('updater.last_ref', ''),
+            'lastUpdateResult' => $settings->get('updater.last_result_json', ''),
+        ]);
     }
 
     /**

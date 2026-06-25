@@ -8,6 +8,7 @@
 /** @var array<string, string> $promptSettings */
 /** @var array<string, mixed>|null $latestSession */
 /** @var bool $isLatestTurn */
+/** @var array<string, mixed> $sidePanel */
 ?>
 <section class="page-header compact-page-header session-reader-header">
     <div>
@@ -19,6 +20,12 @@
         <a class="button" href="<?= e(url('/campaigns/' . $campaign['id'] . '/sessions')) ?>">All story turns</a>
     </div>
 </section>
+
+<?= App\Core\View::partial('partials/campaign_side_panel', [
+    'app' => $app,
+    'campaign' => $campaign,
+    'sidePanel' => $sidePanel,
+]) ?>
 
 <section class="card dm-response-card">
     <div class="section-title-row">

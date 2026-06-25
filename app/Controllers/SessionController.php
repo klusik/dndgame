@@ -8,9 +8,13 @@ use App\Core\Controller;
 use App\Core\Request;
 use App\Core\Response;
 use App\Repositories\CampaignRepository;
+use App\Repositories\EntityRepository;
+use App\Repositories\FactRepository;
+use App\Repositories\MysteryRepository;
 use App\Repositories\SessionRepository;
 use App\Repositories\SettingRepository;
 use App\Services\CampaignPromptSettingsService;
+use App\Services\CampaignSidePanelService;
 use App\Services\FileStorage;
 use App\Services\MarkdownRenderer;
 use App\Services\RollRequirementDetector;
@@ -50,6 +54,14 @@ final class SessionController extends Controller
         $rollRequirement = $isLatestTurn ? (new RollRequirementDetector())->detect($narrative) : (new RollRequirementDetector())->detect('');
         $promptSettings = (new CampaignPromptSettingsService(new SettingRepository($this->app->database())))->getForCampaign((int) $campaign['id'], $this->app->translator()->locale());
         $rollContextKey = sprintf('campaign-%d-session-%d', (int) $campaign['id'], (int) $session['id']);
+        $sidePanel = (new CampaignSidePanelService(
+            new EntityRepository($this->app->database()),
+            new FactRepository($this->app->database()),
+            new MysteryRepository($this->app->database()),
+            $repo,
+            $storage
+        ))->build((int) $campaign['id']);
+
         return $this->render('sessions/show', [
             'campaign' => $campaign,
             'session' => $session,
@@ -60,6 +72,7 @@ final class SessionController extends Controller
             'rollContextKey' => $rollContextKey,
             'latestSession' => $latestSession,
             'isLatestTurn' => $isLatestTurn,
+            'sidePanel' => $sidePanel,
         ]);
     }
 

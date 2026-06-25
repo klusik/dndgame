@@ -114,6 +114,7 @@ Response requirements:
 6. Do not automatically confirm player theories. Record uncertain assumptions as assumptions, labels, or notes unless the character has evidence.
 7. Return exactly this format.
 8. Always include [BEGIN_STATE_DELTA_JSON], even when the narrative only asks the player what they do next. Use empty arrays when nothing changed.
+9. Keep the player-facing journal useful. When a clear objective, job, current goal, resolved task, or next lead appears, add it as a fact with category "objective", "job", "goal", or "task". Store only information the player knows.
 
 [BEGIN_NARRATIVE]
 Your narrative response for the user goes here.
@@ -280,7 +281,7 @@ PROMPT);
             ],
             'facts' => [
                 [
-                    'category' => 'character|location|item|mystery|rule|event|system|other',
+                    'category' => 'character|location|item|mystery|rule|event|system|objective|job|goal|task|resource|equipment|other',
                     'subject' => 'Subject name or text',
                     'predicate' => 'precise_relation_or_property',
                     'value' => 'Precise value or statement',

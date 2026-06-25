@@ -9,6 +9,7 @@
 /** @var string $rollContextKey */
 /** @var array<string, string> $promptSettings */
 $selectedLanguage = $selectedLanguage ?? $app->translator()->locale();
+/** @var array<string, mixed> $sidePanel */
 ?>
 <section class="page-header compact-page-header">
     <div>
@@ -21,6 +22,12 @@ $selectedLanguage = $selectedLanguage ?? $app->translator()->locale();
         <a class="button" href="<?= e(url('/campaigns/' . $campaign['id'] . '/export/html')) ?>">Export HTML</a>
     </div>
 </section>
+
+<?= App\Core\View::partial('partials/campaign_side_panel', [
+    'app' => $app,
+    'campaign' => $campaign,
+    'sidePanel' => $sidePanel,
+]) ?>
 
 <section class="workflow-strip card">
     <div class="workflow-step <?= !$awaitingPrompt && !$pendingDelta ? 'active' : '' ?>">

@@ -15,6 +15,7 @@ use App\Controllers\PlayController;
 use App\Controllers\PromptController;
 use App\Controllers\SessionController;
 use App\Controllers\SettingsController;
+use App\Controllers\UpdaterController;
 use App\Repositories\UserRepository;
 
 /**
@@ -120,6 +121,8 @@ final class Application
         $this->router->get('/dashboard', DashboardController::class, 'index', true);
         $this->router->get('/settings', SettingsController::class, 'index', true);
         $this->router->post('/settings/locale', SettingsController::class, 'setLocale', true);
+        $this->router->post('/settings/updater', UpdaterController::class, 'saveSettings', true);
+        $this->router->post('/settings/updater/run', UpdaterController::class, 'run', true);
 
         $this->router->get('/campaigns', CampaignController::class, 'index', true);
         $this->router->get('/campaigns/create', CampaignController::class, 'create', true);

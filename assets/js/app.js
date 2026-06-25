@@ -235,6 +235,55 @@
         window.alert('The previous DM response requires a dice roll. Roll once before generating the next prompt.');
     }
 
+
+
+    /**
+     * Initialize sticky campaign side panel tabs and collapse state.
+     */
+    function initializeGameSidePanel() {
+        const panel = document.querySelector('[data-side-panel]');
+        if (!(panel instanceof HTMLElement)) {
+            return;
+        }
+
+        document.body.classList.add('has-game-side-panel');
+
+        let storedCollapsed = false;
+        try {
+            storedCollapsed = window.localStorage.getItem('dnd-campaign-side-panel-collapsed') === '1';
+        } catch (error) {
+            storedCollapsed = false;
+        }
+        if (storedCollapsed) {
+            panel.classList.add('collapsed');
+            document.body.classList.add('has-collapsed-game-side-panel');
+        }
+
+        panel.querySelectorAll('[data-side-tab]').forEach((tab) => {
+            tab.addEventListener('click', () => {
+                const selected = tab.getAttribute('data-side-tab') || '';
+                panel.querySelectorAll('[data-side-tab]').forEach((item) => item.classList.toggle('active', item === tab));
+                panel.querySelectorAll('[data-side-tab-panel]').forEach((item) => {
+                    item.classList.toggle('active', item.getAttribute('data-side-tab-panel') === selected);
+                });
+            });
+        });
+
+        const toggle = panel.querySelector('[data-side-panel-collapse]');
+        if (toggle instanceof HTMLButtonElement) {
+            toggle.addEventListener('click', () => {
+                const collapsed = !panel.classList.contains('collapsed');
+                panel.classList.toggle('collapsed', collapsed);
+                document.body.classList.toggle('has-collapsed-game-side-panel', collapsed);
+                try {
+                    window.localStorage.setItem('dnd-campaign-side-panel-collapsed', collapsed ? '1' : '0');
+                } catch (error) {
+                    return;
+                }
+            });
+        }
+    }
+
     document.addEventListener('click', function (event) {
         const target = event.target;
         if (!(target instanceof HTMLElement)) {
@@ -263,4 +312,5 @@
     });
 
     initializeDiceHelpers();
+    initializeGameSidePanel();
 }());

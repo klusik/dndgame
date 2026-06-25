@@ -8,10 +8,14 @@ use App\Core\Controller;
 use App\Core\Request;
 use App\Core\Response;
 use App\Repositories\CampaignRepository;
+use App\Repositories\EntityRepository;
+use App\Repositories\FactRepository;
+use App\Repositories\MysteryRepository;
 use App\Repositories\PromptRepository;
 use App\Repositories\SessionRepository;
 use App\Repositories\SettingRepository;
 use App\Services\CampaignPromptSettingsService;
+use App\Services\CampaignSidePanelService;
 use App\Services\FileStorage;
 use App\Services\MarkdownRenderer;
 use App\Services\RollRequirementDetector;
@@ -41,6 +45,13 @@ final class PlayController extends Controller
         $awaitingPrompt = $promptRepository->findLatestAwaitingResponse((int) $campaign['id']);
         $pendingDelta = $promptRepository->findLatestPendingDelta((int) $campaign['id']);
         $timeline = $this->hydrateTimeline($promptRepository->listGenerationTimeline((int) $campaign['id']), $storage);
+        $sidePanel = (new CampaignSidePanelService(
+            new EntityRepository($this->app->database()),
+            new FactRepository($this->app->database()),
+            new MysteryRepository($this->app->database()),
+            $sessionRepository,
+            $storage
+        ))->build((int) $campaign['id']);
 
         return $this->render('play/show', [
             'campaign' => $campaign,
@@ -54,6 +65,7 @@ final class PlayController extends Controller
             'promptSettings' => $promptSettings,
             'rollRequirement' => $rollRequirement,
             'rollContextKey' => $rollContextKey,
+            'sidePanel' => $sidePanel,
         ]);
     }
 
