@@ -29,10 +29,11 @@ final class GitHubUpdateService
      *
      * @return array<string, mixed>
      */
-    public function update(string $repository, string $ref): array
+    public function update(string $repository, string $ref, string $token = ''): array
     {
         $repository = $this->normalizeRepository($repository);
         $ref = $this->normalizeRef($ref);
+        $token = $this->normalizeToken($token);
 
         if ($repository === '') {
             throw new \RuntimeException('GitHub repository must use owner/repository format.');
@@ -55,12 +56,12 @@ final class GitHubUpdateService
         $this->ensureDirectory(dirname($backupPath));
 
         $url = 'https://api.github.com/repos/' . $repository . '/zipball/' . rawurlencode($ref);
-        $this->download($url, $archivePath);
+        $this->download($url, $archivePath, $token);
         $sourceRoot = $this->extractArchive($archivePath, $extractDir);
 
         $sourceFiles = $this->listFiles($sourceRoot);
         $copyableFiles = array_values(array_filter($sourceFiles, fn (string $path): bool => $this->isAllowedRelativePath($path)));
-        $this->createBackup($sourceRoot, $copyableFiles, $backupPath);
+        $this->createBackup($copyableFiles, $backupPath);
 
         $copied = 0;
         foreach ($copyableFiles as $relativePath) {
@@ -76,6 +77,7 @@ final class GitHubUpdateService
         return [
             'repository' => $repository,
             'ref' => $ref,
+            'private_token_used' => $token !== '',
             'files_copied' => $copied,
             'downloaded_archive' => $this->relativeToRoot($archivePath),
             'backup_archive' => $this->relativeToRoot($backupPath),
@@ -110,14 +112,34 @@ final class GitHubUpdateService
     }
 
     /**
+     * Normalize a GitHub access token without exposing it anywhere.
+     */
+    public function normalizeToken(string $token): string
+    {
+        $token = trim($token);
+        if ($token === '') {
+            return '';
+        }
+        if (strlen($token) > 512 || preg_match('/\s/', $token)) {
+            return '';
+        }
+
+        return $token;
+    }
+
+    /**
      * Download a remote archive using curl when available, otherwise streams.
      */
-    private function download(string $url, string $targetPath): void
+    private function download(string $url, string $targetPath, string $token): void
     {
         $headers = [
             'User-Agent: DnD-ChatGPT-Campaign-Updater',
             'Accept: application/vnd.github+json, application/zip',
+            'X-GitHub-Api-Version: 2022-11-28',
         ];
+        if ($token !== '') {
+            $headers[] = 'Authorization: Bearer ' . $token;
+        }
 
         if (function_exists('curl_init')) {
             $handle = curl_init($url);
@@ -134,12 +156,14 @@ final class GitHubUpdateService
             ]);
             $ok = curl_exec($handle);
             $error = curl_error($handle);
+            $httpCode = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
             curl_close($handle);
             fclose($file);
 
             if (!$ok) {
                 @unlink($targetPath);
-                throw new \RuntimeException('GitHub download failed: ' . $error);
+                $detail = $error !== '' ? $error : 'HTTP ' . $httpCode;
+                throw new \RuntimeException('GitHub download failed: ' . $detail);
             }
             return;
         }
@@ -154,7 +178,7 @@ final class GitHubUpdateService
         ]);
         $data = @file_get_contents($url, false, $context);
         if (!is_string($data) || $data === '') {
-            throw new \RuntimeException('GitHub download failed. Enable curl or allow_url_fopen.');
+            throw new \RuntimeException('GitHub download failed. Enable curl or allow_url_fopen. For private repositories, save a token with read access.');
         }
         file_put_contents($targetPath, $data);
     }
@@ -166,7 +190,7 @@ final class GitHubUpdateService
     {
         $zip = new ZipArchive();
         if ($zip->open($archivePath) !== true) {
-            throw new \RuntimeException('Downloaded archive is not a valid ZIP file.');
+            throw new \RuntimeException('Downloaded archive is not a valid ZIP file. Check the repository, ref, and token permissions.');
         }
         if (!$zip->extractTo($extractDir)) {
             $zip->close();
@@ -190,7 +214,7 @@ final class GitHubUpdateService
      *
      * @param array<int, string> $relativeFiles
      */
-    private function createBackup(string $sourceRoot, array $relativeFiles, string $backupPath): void
+    private function createBackup(array $relativeFiles, string $backupPath): void
     {
         $zip = new ZipArchive();
         if ($zip->open($backupPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {

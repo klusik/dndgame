@@ -1303,3 +1303,34 @@ th {
         grid-template-columns: 1fr;
     }
 }
+
+.compact-help-text {
+    margin: -4px 0 0;
+    font-size: 0.92rem;
+}
+
+.updater-token-status {
+    display: flex;
+    align-items: center;
+}
+
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 5px 10px;
+    font-size: 0.82rem;
+    font-weight: 800;
+}
+
+.status-pill-ok {
+    border-color: #bbf7d0;
+    background: #f0fdf4;
+    color: #166534;
+}
+
+.status-pill-muted {
+    background: #f8fafc;
+    color: var(--muted);
+}

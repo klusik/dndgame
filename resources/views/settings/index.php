@@ -1,5 +1,6 @@
 <?php
 /** @var string $githubRepository */
+/** @var bool $githubTokenConfigured */
 /** @var string $lastUpdateRef */
 /** @var string $lastUpdateResult */
 $user = $app->auth()->user();
@@ -41,7 +42,21 @@ $isAdmin = $user && (string) ($user['role'] ?? '') === 'admin';
                 <label>GitHub repository
                     <input type="text" name="github_repository" value="<?= e($githubRepository) ?>" placeholder="owner/repository" autocomplete="off">
                 </label>
-                <button class="button" type="submit">Save repository</button>
+                <label>GitHub token for private repositories
+                    <input type="password" name="github_token" value="" placeholder="Leave empty to keep current token" autocomplete="new-password">
+                </label>
+                <p class="muted-text compact-help-text">
+                    Use a fine-grained GitHub token with read-only Contents access for this repository. The token is stored server-side and is never printed back into the page.
+                </p>
+                <div class="updater-token-status">
+                    <span class="status-pill <?= $githubTokenConfigured ? 'status-pill-ok' : 'status-pill-muted' ?>">
+                        <?= $githubTokenConfigured ? 'Private token saved' : 'No private token saved' ?>
+                    </span>
+                </div>
+                <?php if ($githubTokenConfigured): ?>
+                    <label class="checkbox-label updater-confirm-row"><input type="checkbox" name="clear_github_token" value="1"> Clear saved token</label>
+                <?php endif; ?>
+                <button class="button" type="submit">Save updater settings</button>
             </form>
 
             <form method="post" action="<?= e(url('/settings/updater/run')) ?>" class="stacked-form updater-run-form">

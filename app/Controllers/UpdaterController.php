@@ -24,15 +24,30 @@ final class UpdaterController extends Controller
         $this->requireAdmin();
 
         $repository = (string) $request->input('github_repository', '');
+        $tokenInput = (string) $request->input('github_token', '');
+        $clearToken = (string) $request->input('clear_github_token', '') === '1';
+
         $service = new GitHubUpdateService(APP_ROOT);
-        $normalized = $service->normalizeRepository($repository);
-        if ($normalized === '') {
+        $normalizedRepository = $service->normalizeRepository($repository);
+        if ($normalizedRepository === '') {
             $this->app->session()->flash('error', 'Use GitHub repository format owner/repository.');
             return $this->redirect('/settings');
         }
 
         $settings = new SettingRepository($this->app->database());
-        $settings->set('updater.github_repository', $normalized);
+        $settings->set('updater.github_repository', $normalizedRepository);
+
+        if ($clearToken) {
+            $settings->set('updater.github_token', '');
+        } elseif (trim($tokenInput) !== '') {
+            $normalizedToken = $service->normalizeToken($tokenInput);
+            if ($normalizedToken === '') {
+                $this->app->session()->flash('error', 'GitHub token is invalid. Paste the token without spaces or line breaks.');
+                return $this->redirect('/settings');
+            }
+            $settings->set('updater.github_token', $normalizedToken);
+        }
+
         $this->app->session()->flash('success', 'Updater settings saved.');
         return $this->redirect('/settings');
     }
@@ -48,6 +63,7 @@ final class UpdaterController extends Controller
         $settings = new SettingRepository($this->app->database());
         $repository = (string) $request->input('github_repository', (string) $settings->get('updater.github_repository', ''));
         $ref = (string) $request->input('github_ref', '');
+        $token = (string) $settings->get('updater.github_token', '');
         $confirm = (string) $request->input('confirm_update', '') === '1';
 
         if (!$confirm) {
@@ -57,7 +73,7 @@ final class UpdaterController extends Controller
 
         try {
             $service = new GitHubUpdateService(APP_ROOT);
-            $result = $service->update($repository, $ref);
+            $result = $service->update($repository, $ref, $token);
             $settings->set('updater.github_repository', (string) $result['repository']);
             $settings->set('updater.last_ref', (string) $result['ref']);
             $settings->set('updater.last_result_json', json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '{}');

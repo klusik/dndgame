@@ -24,6 +24,7 @@ final class SettingsController extends Controller
             'githubRepository' => $settings->get('updater.github_repository', ''),
             'lastUpdateRef' => $settings->get('updater.last_ref', ''),
             'lastUpdateResult' => $settings->get('updater.last_result_json', ''),
+            'githubTokenConfigured' => trim((string) $settings->get('updater.github_token', '')) !== '',
         ]);
     }
 
