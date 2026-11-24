@@ -1,0 +1,26 @@
+<?php
+/** @var array<string, mixed> $campaign */
+$selectedLanguage = $responseLanguage ?? $app->translator()->locale();
+?>
+<section class="page-header compact-page-header">
+    <div>
+        <p class="eyebrow">Prompt</p>
+        <h1>Generate prompt</h1>
+    </div>
+    <a class="button" href="<?= e(url('/campaigns/' . $campaign['id'] . '/play')) ?>">Back to play workflow</a>
+</section>
+<div class="card form-card wide next-turn-card">
+    <?php if (!empty($errors)): ?><div class="alert"><?= e(implode(' ', $errors)) ?></div><?php endif; ?>
+    <?= App\Core\View::partial('partials/next_action_form', [
+        'app' => $app,
+        'campaign' => $campaign,
+        'selectedLanguage' => $selectedLanguage,
+        'defaultNarrativeLength' => $defaultNarrativeLength ?? 'medium',
+        'defaultChallengeLevel' => $defaultChallengeLevel ?? 'balanced',
+        'defaultDicePolicy' => $defaultDicePolicy ?? 'occasional',
+        'buttonLabel' => 'Generate copy-ready prompt',
+        'userAction' => $userAction ?? '',
+        'extraNotes' => $extraNotes ?? '',
+        'diceResults' => $diceResults ?? '',
+    ]) ?>
+</div>

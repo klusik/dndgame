@@ -1,0 +1,8 @@
+/config.php
+/storage/*
+!/storage/.gitkeep
+!/storage/.htaccess
+*.log
+.DS_Store
+Thumbs.db
+/deploy/
